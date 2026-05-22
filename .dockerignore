@@ -1,0 +1,29 @@
+# Python cache & virtualenv
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+
+# Environment secrets — NEVER include in the image
+.env
+
+# Database file (persisted via Docker volume, not baked into image)
+*.db
+*.db-shm
+*.db-wal
+
+# Git
+.git/
+.gitignore
+
+# Mac junk
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Docker artifacts themselves
+Dockerfile
+docker-compose.yml

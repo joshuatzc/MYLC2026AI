@@ -1,0 +1,34 @@
+services:
+  mylc-bot:
+    build: .
+    container_name: mylc-bot
+    restart: unless-stopped
+
+    # Load secrets from your .env file — never commit .env to git!
+    env_file:
+      - .env
+
+    # Override DATABASE_URL to point inside the persistent /data volume
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:////data/church_game.db
+
+    ports:
+      # Expose the admin API (optional — remove if you don't need external access)
+      - "8000:8000"
+
+    volumes:
+      # Persists church_game.db across restarts and redeployments
+      # On Synology, this maps to a named Docker volume managed by Container Manager
+      - mylc_data:/data
+
+    # Health check — Container Manager will show green/red status
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  mylc_data:
+    driver: local
