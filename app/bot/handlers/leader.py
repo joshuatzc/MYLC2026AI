@@ -66,7 +66,35 @@ async def handle_become_leader(message: Message) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Admin Section – entry (leader only)
+# NOTE: must be registered BEFORE the catch-all F.text handler below,
+# otherwise aiogram matches the catch-all first.
+# ---------------------------------------------------------------------------
+
+@router.message(F.text == "Admin Section")
+async def handle_admin_section(message: Message) -> None:
+    chat_id = str(message.chat.id)
+
+    async with AsyncSessionLocal() as db:
+        role = await auth.get_role(db, chat_id)
+
+    if role != "leader":
+        await message.answer("⛔ You need to be a leader to access this section.")
+        return
+
+    await _show_admin_eligible(message, chat_id, edit=False)
+
+
+@router.callback_query(F.data == "admin_section")
+async def cb_admin_section(callback: CallbackQuery) -> None:
+    chat_id = str(callback.message.chat.id)
+    await _show_admin_eligible(callback.message, chat_id, edit=True)
+    await callback.answer()
+
+
+# ---------------------------------------------------------------------------
 # Become Leader – password submission (catches any non-button text when awaiting)
+# NOTE: this catch-all must stay AFTER all specific F.text == "..." handlers.
 # ---------------------------------------------------------------------------
 
 @router.message(F.text)
@@ -108,31 +136,6 @@ async def _process_leader_password(
             "❌ Incorrect password. Please try again or tap another button.",
             reply_markup=main_menu_keyboard(role),
         )
-
-
-# ---------------------------------------------------------------------------
-# Admin Section – entry (leader only)
-# ---------------------------------------------------------------------------
-
-@router.message(F.text == "Admin Section")
-async def handle_admin_section(message: Message) -> None:
-    chat_id = str(message.chat.id)
-
-    async with AsyncSessionLocal() as db:
-        role = await auth.get_role(db, chat_id)
-
-    if role != "leader":
-        await message.answer("⛔ You need to be a leader to access this section.")
-        return
-
-    await _show_admin_eligible(message, chat_id, edit=False)
-
-
-@router.callback_query(F.data == "admin_section")
-async def cb_admin_section(callback: CallbackQuery) -> None:
-    chat_id = str(callback.message.chat.id)
-    await _show_admin_eligible(callback.message, chat_id, edit=True)
-    await callback.answer()
 
 
 async def _show_admin_eligible(
