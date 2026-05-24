@@ -23,6 +23,9 @@ COPY scripts/ ./scripts/
 # Data directory for persistent SQLite database (mount a volume here)
 RUN mkdir -p /data
 
+# Ensure all files are readable regardless of source permissions (e.g. OneDrive sync)
+RUN chmod -R 755 /app
+
 # Run as non-root for security
 RUN useradd -m botuser && chown -R botuser /app /data
 USER botuser
