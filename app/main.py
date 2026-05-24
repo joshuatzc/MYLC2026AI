@@ -32,6 +32,12 @@ async def on_startup() -> None:
     logger.info("Initialising database…")
     await init_db()
 
+    logger.info("Seeding station data…")
+    from scripts.seed import seed
+    from app.database import AsyncSessionLocal
+    async with AsyncSessionLocal() as db:
+        await seed(db)
+
     # Launch bot polling in the background
     from app.bot_runner import create_bot, create_dispatcher
 

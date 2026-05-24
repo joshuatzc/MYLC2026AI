@@ -190,7 +190,11 @@ async def seed(db: AsyncSession) -> None:
                 )
             )
             existing_lv = result2.scalar_one_or_none()
+            hint = HINTS.get(name, ["", "", ""])[i]
             if existing_lv:
+                # Always sync config fields — game progress rows are untouched
+                existing_lv.hint_text = hint
+                existing_lv.reward_multiplier = multiplier
                 level_obj[(name, level_num)] = existing_lv
             else:
                 hint = HINTS.get(name, ["", "", ""])[i]
@@ -251,6 +255,27 @@ async def seed(db: AsyncSession) -> None:
     print(f"✅  Prereqs  : {prereqs_added} added, {prereqs_skipped} already existed")
     print(f"✅  Groups   : {groups_added} added ({len(GROUPS)} total)")
     print("─" * 50)
+
+
+async def reseed() -> dict:
+    """
+    Wipe the entire database and re-run the seed from scratch.
+    All game progress, groups, stations, and chat state are reset.
+    """
+    from app.database import engine
+    from app.models import Base
+
+    # Drop every table, then recreate the schema
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(Base.metadata.create_all)
+    print("💥  All tables dropped and recreated.")
+
+    # Fresh seed
+    async with AsyncSessionLocal() as db:
+        await seed(db)
+
+    return {"status": "ok", "message": "Database wiped and reseeded successfully."}
 
 
 async def main() -> None:

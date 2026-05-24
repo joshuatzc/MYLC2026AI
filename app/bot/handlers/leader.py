@@ -17,7 +17,6 @@ from aiogram import F, Router
 from aiogram.types import CallbackQuery, Message
 
 from app.bot.keyboards import (
-    admin_after_upgrade_keyboard,
     admin_confirm_keyboard,
     admin_eligible_keyboard,
     main_menu_keyboard,
@@ -89,6 +88,12 @@ async def handle_admin_section(message: Message) -> None:
 async def cb_admin_section(callback: CallbackQuery) -> None:
     chat_id = str(callback.message.chat.id)
     await _show_admin_eligible(callback.message, chat_id, edit=True)
+    await callback.answer()
+
+
+@router.callback_query(F.data == "admin_cancel")
+async def cb_admin_cancel(callback: CallbackQuery) -> None:
+    await callback.message.edit_text("Okay, cancelled.")
     await callback.answer()
 
 
@@ -225,6 +230,5 @@ async def cb_admin_confirm(callback: CallbackQuery) -> None:
         f"{result['station_name']} – Level {result['level_number']}\n"
         f"Population: *{result['old_population']:,.1f}* → *{result['new_population']:,.1f}* 🎉",
         parse_mode="Markdown",
-        reply_markup=admin_after_upgrade_keyboard(),
     )
     await callback.answer("Upgrade applied!")

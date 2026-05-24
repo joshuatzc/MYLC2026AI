@@ -13,9 +13,7 @@ from aiogram import F, Router
 from aiogram.types import CallbackQuery, Message
 
 from app.bot.keyboards import (
-    eligible_detail_keyboard,
     eligible_levels_keyboard,
-    locked_detail_keyboard,
     locked_levels_keyboard,
 )
 from app.bot.utils import require_group
@@ -93,7 +91,6 @@ async def cb_eligible_detail(callback: CallbackQuery) -> None:
         f"{level.station.name} – Level {level.level_number}\n\n"
         f"💡 *Hint:* _{level.hint_text}_",
         parse_mode="Markdown",
-        reply_markup=eligible_detail_keyboard(),
     )
     await callback.answer()
 
@@ -186,6 +183,5 @@ async def cb_locked_detail(callback: CallbackQuery) -> None:
         f"💡 *Hint:* _{level.hint_text}_\n\n"
         f"For *{group_name}*, you still need to complete:\n{missing_lines}",
         parse_mode="Markdown",
-        reply_markup=locked_detail_keyboard(),
     )
     await callback.answer()

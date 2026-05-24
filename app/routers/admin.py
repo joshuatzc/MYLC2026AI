@@ -16,17 +16,37 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.config import settings
 from app.database import get_session
 from app.models import Group, Station, StationLevel
 from app.services import game_logic
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+# ---------------------------------------------------------------------------
+# Auth helper
+# ---------------------------------------------------------------------------
+
+async def _require_admin_key(
+    x_admin_key: str | None = Header(default=None),
+) -> None:
+    """
+    All mutating admin endpoints must supply the correct secret key via the
+    ``X-Admin-Key`` request header.  The value must match ``SECRET_KEY`` from
+    the environment / .env file.
+    """
+    if x_admin_key != settings.SECRET_KEY:
+        raise HTTPException(
+            status_code=403,
+            detail="Forbidden – supply a valid X-Admin-Key header.",
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -63,6 +83,27 @@ class UpgradeRequest(BaseModel):
 @router.get("/leaderboard")
 async def admin_leaderboard(db: AsyncSession = Depends(get_session)) -> list[dict]:
     return await game_logic.get_leaderboard(db)
+
+
+# ---------------------------------------------------------------------------
+# Reseed
+# ---------------------------------------------------------------------------
+
+@router.post("/reseed")
+async def reseed(
+    _: None = Depends(_require_admin_key),
+) -> dict:
+    """
+    Wipe the entire database and reseed it from scratch.
+
+    - All tables are dropped and recreated.
+    - Stations, levels, prerequisites, and groups are repopulated from seed.py.
+    - All game progress and chat state is reset.
+
+    Requires ``X-Admin-Key: <SECRET_KEY>`` header.
+    """
+    from scripts.seed import reseed as _reseed
+    return await _reseed()
 
 
 # ---------------------------------------------------------------------------

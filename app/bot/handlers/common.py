@@ -7,8 +7,7 @@ from aiogram import F, Router
 from aiogram.filters import CommandStart
 from aiogram.types import CallbackQuery, Message
 
-from app.bot.keyboards import groups_inline_keyboard, main_menu_keyboard
-from app.bot.utils import send_main_menu
+from app.bot.keyboards import groups_inline_keyboard
 from app.database import AsyncSessionLocal
 from app.services import auth, game_logic
 
@@ -107,8 +106,7 @@ async def cb_select_group(callback: CallbackQuery) -> None:
         "Your role has been reset to Normal.",
         parse_mode="Markdown",
     )
-    await callback.message.answer("Main Menu", reply_markup=main_menu_keyboard(role))
-    await callback.answer()
+    await callback.answer("Group updated!", show_alert=False)
 
 
 # ---------------------------------------------------------------------------

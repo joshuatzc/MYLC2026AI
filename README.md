@@ -82,7 +82,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 The API will be available at `http://localhost:8000`.  
 Interactive API docs: `http://localhost:8000/docs`
 
-The Telegram bot starts automatically alongside the FastAPI server on startup.
+The Telegram bot and database seeding both start automatically alongside the FastAPI server.
 
 ---
 
@@ -101,6 +101,7 @@ This will:
 - Load your secrets from `.env`
 - Create a named Docker volume (`mylc_data`) to persist the SQLite database across restarts
 - Start the container in the background
+- **Automatically seed** stations, levels, prerequisites, and groups on first boot
 
 ### 2. Check that it's running
 
@@ -126,7 +127,7 @@ git pull
 docker compose up -d --build
 ```
 
-Docker will rebuild only the layers that changed, then restart the container with zero downtime.
+Docker will rebuild only the layers that changed, then restart the container. On startup, any new station data (new hints, multipliers, etc.) defined in `scripts/seed.py` is automatically applied — **game progress is never touched**.
 
 ---
 
@@ -145,7 +146,8 @@ Docker will rebuild only the layers that changed, then restart the container wit
 │   │   └── admin.py     # FastAPI admin REST endpoints
 │   └── services/        # Business logic layer
 ├── scripts/
-│   └── seed.py          # Optional: seed the database with initial data
+│   ├── seed.py          # Station/level/group definitions — auto-applied on startup
+│   └── reseed.sh        # Dev helper: wipe DB and reseed via the admin API
 ├── Dockerfile
 ├── docker-compose.yml
 ├── requirements.txt
@@ -158,24 +160,30 @@ Docker will rebuild only the layers that changed, then restart the container wit
 
 Once running, the admin REST API is available at `http://localhost:8000`.
 
-| Endpoint | Description |
-|---|---|
-| `GET /` | Health check |
-| `GET /docs` | Interactive Swagger UI |
+| Endpoint | Method | Auth | Description |
+|---|---|---|---|
+| `GET /` | — | — | Health check |
+| `GET /docs` | — | — | Interactive Swagger UI |
+| `GET /admin/leaderboard` | — | — | Live leaderboard |
+| `GET /admin/stations` | — | — | List all stations and levels |
+| `GET /admin/groups` | — | — | List all groups |
+| `POST /admin/reseed` | `X-Admin-Key` | Wipe DB and reseed from scratch (dev reset) |
 
 ---
 
-## 🌱 Seeding the Database (Optional)
+## 🔄 Resetting Game State (Dev)
 
-To pre-populate the database with groups or initial data, run:
+To wipe all game progress and start fresh without exec-ing into the container:
 
 ```bash
-# Uvicorn route
-python -m scripts.seed
-
-# Docker route
-docker compose exec mylc-bot python -m scripts.seed
+bash scripts/reseed.sh
+# or against a remote host:
+bash scripts/reseed.sh 192.168.1.100 8000
 ```
+
+The script reads `SECRET_KEY` from your `.env` automatically and calls `POST /admin/reseed`.
+
+> **⚠️ This is destructive.** All group progress, populations, and chat states are permanently deleted. Station definitions are reloaded from `seed.py`.
 
 ---
 

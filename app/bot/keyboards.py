@@ -63,8 +63,7 @@ def eligible_levels_keyboard(
     builder.adjust(1)
     if show_locked_btn:
         builder.button(text="🔒 Show locked options", callback_data="show_locked")
-    builder.button(text="🏠 Back to Main Menu", callback_data="main_menu")
-    builder.adjust(1)
+        builder.adjust(1)
     return builder.as_markup()
 
 
@@ -85,7 +84,6 @@ def locked_levels_keyboard(locked: list[dict]) -> InlineKeyboardMarkup:
         )
     builder.adjust(1)
     builder.button(text="← Back to eligible list", callback_data="show_eligible")
-    builder.button(text="🏠 Back to Main Menu", callback_data="main_menu")
     builder.adjust(1)
     return builder.as_markup()
 
@@ -111,7 +109,7 @@ def admin_eligible_keyboard(eligible: list[dict]) -> InlineKeyboardMarkup:
             callback_data=f"admin_upgrade_detail:{lv['id']}",
         )
     builder.adjust(1)
-    builder.button(text="🏠 Back to Main Menu", callback_data="main_menu")
+    builder.button(text="❌ Cancel", callback_data="admin_cancel")
     builder.adjust(1)
     return builder.as_markup()
 
@@ -122,7 +120,7 @@ def admin_confirm_keyboard(level_id: int) -> InlineKeyboardMarkup:
         text="✅ Yes, confirm",
         callback_data=f"admin_confirm:{level_id}",
     )
-    builder.button(text="❌ Cancel", callback_data="admin_section")
+    builder.button(text="❌ Cancel", callback_data="admin_cancel")
     builder.adjust(1)
     return builder.as_markup()
 
