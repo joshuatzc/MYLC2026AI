@@ -42,44 +42,44 @@ MULTIPLIERS = [1.2, 1.5, 3.0]
 
 HINTS: dict[str, list[str]] = {
     "Social Media": [
-        "Your first post reaches the neighbourhood.",
-        "A viral moment puts your church on the map.",
-        "Millions watch your Sunday stream.",
+        "Lights. Camera. 15 seconds of courage.",
+        "The stakes are higher. So is the cringe.",
+        "No going back. The internet never forgets.",
     ],
     "Worship Team": [
-        "A few musicians gather for the first practice.",
-        "The harmonies bring tears to the front row.",
-        "Your choir is invited to record a worship album.",
+        "Dust off something very, very old.",
+        "Your feet know the words better than your mouth does.",
+        "Make music — but leave your instruments at home.",
     ],
     "Sound Crew": [
-        "Someone figures out how to stop the feedback.",
-        "Crystal-clear sound fills every corner.",
-        "The PA system becomes the envy of every church in the district.",
+        "Order from chaos. You have the clock against you.",
+        "Crack the code hidden in the colours.",
+        "Look closely. The answer was always right in front of you.",
     ],
     "Powerpoint Team": [
-        "Slides appear on screen — most of the time.",
-        "Seamless transitions and on-time lyrics every week.",
-        "Custom motion backgrounds and live lyric sync.",
+        "Every keystroke counts. Don't slow the team down.",
+        "Someone shuffled the story. Put it back together.",
+        "Lost in translation? That's the point.",
     ],
     "Preachers": [
-        "The message is short but sincere.",
-        "People stay behind to ask questions.",
-        "A sermon series goes regional.",
+        "No words allowed — but the story must get through.",
+        "One object. Five voices. One message.",
+        "Whisper it. Act it. Hope something survives.",
     ],
     "Welcome Team / Ushers": [
-        "Doors are open and smiles are ready.",
-        "Every visitor gets a follow-up call.",
-        "First-timers never leave without a friend.",
+        "Just act normal. (Good luck with that.)",
+        "Normal is harder with things in the way.",
+        "Can you find normal when you can't even find the floor?",
     ],
     "Children Ministry": [
-        "A small Sunday school class meets in the foyer.",
-        "Parents stop worrying mid-sermon.",
-        "Kids bring their friends — and their parents follow.",
+        "Stay in the lines — and know exactly which lines.",
+        "Same task, different canvas. Do you know your colours?",
+        "Follow the story carefully. The fold is hidden in the words.",
     ],
     "Finance": [
-        "Tithes are counted, offerings tracked.",
-        "A transparent budget builds trust.",
-        "Generous giving unlocks a building project.",
+        "The shadow knows the shape. Do you?",
+        "Same pieces, different problem. Think harder.",
+        "This is the final test. There is no mercy.",
     ],
 }
 
