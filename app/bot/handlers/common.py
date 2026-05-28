@@ -47,7 +47,7 @@ async def cmd_start(message: Message) -> None:
 # Leaderboard
 # ---------------------------------------------------------------------------
 
-@router.message(F.text == "Leaderboard")
+@router.message(F.text == "🏆 Leaderboard")
 async def handle_leaderboard(message: Message) -> None:
     async with AsyncSessionLocal() as db:
         board = await game_logic.get_leaderboard(db)
@@ -69,7 +69,7 @@ async def handle_leaderboard(message: Message) -> None:
 # Change Group – trigger
 # ---------------------------------------------------------------------------
 
-@router.message(F.text == "Change Group")
+@router.message(F.text == "🔄 Change Group")
 async def handle_change_group(message: Message) -> None:
     async with AsyncSessionLocal() as db:
         groups = await game_logic.list_groups(db)

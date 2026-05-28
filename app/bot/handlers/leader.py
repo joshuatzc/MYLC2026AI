@@ -15,12 +15,12 @@ from __future__ import annotations
 
 from aiogram import F, Router
 from aiogram.types import CallbackQuery, Message
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.bot.keyboards import (
     admin_confirm_keyboard,
     admin_eligible_keyboard,
     main_menu_keyboard,
-    admin_main_keyboard,
     admin_after_upgrade_keyboard,
     church_steal_targets_keyboard,
 )
@@ -52,7 +52,7 @@ async def _fetch_level(db, level_id: int) -> StationLevel | None:
 # Become Leader – trigger
 # ---------------------------------------------------------------------------
 
-@router.message(F.text == "Become Leader")
+@router.message(F.text == "👑 Become Leader")
 async def handle_become_leader(message: Message) -> None:
     chat_id = str(message.chat.id)
     group_id = await require_group(message, chat_id)
@@ -73,33 +73,7 @@ async def handle_become_leader(message: Message) -> None:
 # otherwise aiogram matches the catch-all first.
 # ---------------------------------------------------------------------------
 
-async def _show_admin_menu(message: Message, chat_id: str, *, edit: bool = False) -> None:
-    async with AsyncSessionLocal() as db:
-        group_id = await auth.get_current_group_id(db, chat_id)
-        if group_id is None:
-            await message.answer("⚠️ No group selected.")
-            return
-        group = await _fetch_group(db, group_id)
-    
-    if group is None:
-        await message.answer("⚠️ Selected group not found.")
-        return
-
-    text = (
-        f"🛠️ *Admin Section — {group.name}*\n"
-        f"━━━━━━━━━━━━━━━━━━━\n"
-        f"Church Tier: *{game_logic.get_church_tier_name(group.church_level)}* (Level {group.church_level})\n"
-        f"Current Population: *{int(group.population):,}*\n\n"
-        f"Choose an administrative action:"
-    )
-    kb = admin_main_keyboard()
-    if edit:
-        await message.edit_text(text, parse_mode="Markdown", reply_markup=kb)
-    else:
-        await message.answer(text, parse_mode="Markdown", reply_markup=kb)
-
-
-@router.message(F.text == "Admin Section")
+@router.message(F.text == "🔑 Admin Section")
 async def handle_admin_section(message: Message) -> None:
     chat_id = str(message.chat.id)
 
@@ -110,26 +84,44 @@ async def handle_admin_section(message: Message) -> None:
         await message.answer("⛔ You need to be a leader to access this section.")
         return
 
-    await _show_admin_menu(message, chat_id, edit=False)
+    async with AsyncSessionLocal() as db:
+        await auth.set_awaiting(db, chat_id, None)
+
+    await _show_admin_eligible(message, chat_id, edit=False)
 
 
 @router.callback_query(F.data == "admin_section")
 async def cb_admin_section(callback: CallbackQuery) -> None:
     chat_id = str(callback.message.chat.id)
-    await _show_admin_menu(callback.message, chat_id, edit=True)
-    await callback.answer()
-
-
-@router.callback_query(F.data == "admin_record_upgrade_list")
-async def cb_admin_record_upgrade_list(callback: CallbackQuery) -> None:
-    chat_id = str(callback.message.chat.id)
+    async with AsyncSessionLocal() as db:
+        await auth.set_awaiting(db, chat_id, None)
     await _show_admin_eligible(callback.message, chat_id, edit=True)
     await callback.answer()
 
 
 @router.callback_query(F.data == "admin_cancel")
 async def cb_admin_cancel(callback: CallbackQuery) -> None:
+    chat_id = str(callback.message.chat.id)
+    async with AsyncSessionLocal() as db:
+        await auth.set_awaiting(db, chat_id, None)
     await callback.message.edit_text("Action cancelled.")
+    await callback.answer()
+
+
+@router.callback_query(F.data == "admin_rename_church_start")
+async def cb_admin_rename_church_start(callback: CallbackQuery) -> None:
+    chat_id = str(callback.message.chat.id)
+    async with AsyncSessionLocal() as db:
+        await auth.set_awaiting(db, chat_id, "rename_church")
+
+    builder = InlineKeyboardBuilder()
+    builder.button(text="❌ Cancel", callback_data="admin_section")
+
+    await callback.message.edit_text(
+        "✏️ *Rename Church*\n\nPlease enter the new name for your church:",
+        parse_mode="Markdown",
+        reply_markup=builder.as_markup(),
+    )
     await callback.answer()
 
 
@@ -148,6 +140,8 @@ async def handle_text_input(message: Message) -> None:
 
     if awaiting == "leader_password":
         await _process_leader_password(message, chat_id, message.text or "")
+    elif awaiting == "rename_church":
+        await _process_rename_church(message, chat_id, message.text or "")
     else:
         # Unknown text – show main menu reminder
         async with AsyncSessionLocal() as db:
@@ -177,6 +171,69 @@ async def _process_leader_password(
             "❌ Incorrect password. Please try again or tap another button.",
             reply_markup=main_menu_keyboard(role),
         )
+
+
+async def _process_rename_church(
+    message: Message, chat_id: str, new_name: str
+) -> None:
+    new_name = new_name.strip()
+    if not new_name:
+        await message.answer(
+            "⚠️ The church name cannot be empty. Please enter a valid name:"
+        )
+        return
+
+    if len(new_name) > 100:
+        await message.answer(
+            "⚠️ The name is too long. Please keep it under 100 characters:"
+        )
+        return
+
+    async with AsyncSessionLocal() as db:
+        # Check if the name is already taken
+        name_check = await db.execute(
+            select(Group).where(Group.name == new_name)
+        )
+        existing_group = name_check.scalar_one_or_none()
+
+        if existing_group:
+            builder = InlineKeyboardBuilder()
+            builder.button(text="❌ Cancel", callback_data="admin_section")
+            await message.answer(
+                f"⚠️ The name *{new_name}* is already taken by another church. Please choose a different name:",
+                parse_mode="Markdown",
+                reply_markup=builder.as_markup(),
+            )
+            return
+
+        group_id = await auth.get_current_group_id(db, chat_id)
+        if group_id is None:
+            await auth.set_awaiting(db, chat_id, None)
+            await message.answer("⚠️ No group selected.")
+            return
+
+        group = await _fetch_group(db, group_id)
+        if group is None:
+            await auth.set_awaiting(db, chat_id, None)
+            await message.answer("⚠️ Selected group not found.")
+            return
+
+        old_name = group.name
+        group.name = new_name
+
+        # Clear awaiting state
+        await auth.set_awaiting(db, chat_id, None)
+        await db.commit()
+
+    await message.answer(
+        f"✅ *Church renamed successfully!*\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"Old Name: *{old_name}*\n"
+        f"New Name: *{new_name}*\n",
+        parse_mode="Markdown",
+    )
+    # Then show the admin upgrades list directly in a new message
+    await _show_admin_eligible(message, chat_id, edit=False)
 
 
 async def _show_admin_eligible(

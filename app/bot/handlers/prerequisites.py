@@ -44,7 +44,7 @@ async def _fetch_level(db, level_id: int) -> StationLevel | None:
 # Step 1 – Eligible list (entry point from reply keyboard)
 # ---------------------------------------------------------------------------
 
-@router.message(F.text == "Check Prerequisites")
+@router.message(F.text == "📋 Check Prerequisites")
 async def handle_check_prereqs(message: Message) -> None:
     chat_id = str(message.chat.id)
     group_id = await require_group(message, chat_id)

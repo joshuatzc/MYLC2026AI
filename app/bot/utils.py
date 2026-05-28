@@ -35,7 +35,7 @@ async def require_group(message: Message, chat_id: str) -> int | None:
     if group_id is None:
         await message.answer(
             "⚠️ You haven't selected a group yet.\n"
-            "Tap *Change Group* to choose one.",
+            "Tap *🔄 Change Group* to choose one.",
             parse_mode="Markdown",
         )
     return group_id

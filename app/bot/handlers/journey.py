@@ -15,7 +15,7 @@ from sqlalchemy import select
 router = Router()
 
 
-@router.message(F.text == "My Journey")
+@router.message(F.text == "🗺️ My Journey")
 async def handle_my_journey(message: Message) -> None:
     chat_id = str(message.chat.id)
     group_id = await require_group(message, chat_id)
