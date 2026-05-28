@@ -88,11 +88,11 @@ async def _show_admin_menu(message: Message, chat_id: str, *, edit: bool = False
     text = (
         f"🛠️ *Admin Section — {group.name}*\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
-        f"Church Level: *{group.church_level}* ({game_logic.get_church_tier_name(group.church_level)})\n"
-        f"Steal Charges: `{group.steal_charges}`\n\n"
-        f"Choose an action:"
+        f"Church Tier: *{game_logic.get_church_tier_name(group.church_level)}* (Level {group.church_level})\n"
+        f"Current Population: *{int(group.population):,}*\n\n"
+        f"Choose an administrative action:"
     )
-    kb = admin_main_keyboard(group.steal_charges)
+    kb = admin_main_keyboard()
     if edit:
         await message.edit_text(text, parse_mode="Markdown", reply_markup=kb)
     else:
