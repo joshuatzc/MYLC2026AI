@@ -71,7 +71,19 @@ async def handle_leaderboard(message: Message) -> None:
 
 @router.message(F.text == "🔄 Change Group")
 async def handle_change_group(message: Message) -> None:
+    chat_id = str(message.chat.id)
     async with AsyncSessionLocal() as db:
+        group_id = await auth.get_current_group_id(db, chat_id)
+        if group_id is not None:
+            # Already has a group — require admin password to change
+            await auth.set_awaiting(db, chat_id, "change_group_password")
+            await message.answer(
+                "🔑 *Changing your group requires the admin password.*\n\n"
+                "Please enter the password:",
+                parse_mode="Markdown",
+            )
+            return
+
         groups = await game_logic.list_groups(db)
 
     if not groups:

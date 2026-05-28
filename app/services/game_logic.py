@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -19,6 +19,8 @@ from app.models import (
     StationLevel,
     StationLevelPrerequisite,
     StealRecord,
+    GroupHintPurchase,
+    Station,
 )
 
 
@@ -31,6 +33,24 @@ CHURCH_TIERS = {
     1: {"name": "Family Church", "max_occupancy": 500, "bonus": 0.10, "min_population": 15, "steal_amount": 15},
     2: {"name": "Mega Church", "max_occupancy": 10000, "bonus": 0.20, "min_population": 300, "steal_amount": 150},
     3: {"name": "Giga Church", "max_occupancy": 10000000, "bonus": 0.30, "min_population": 10000, "steal_amount": 2000},
+}
+
+CHURCH_HINTS = {
+    1: {
+        1: "Welcome Team & Children Ministry must reach Level 1 before this upgrade is allowed.",
+        2: "Your group population must be at least 15 members to host a Family Church.",
+        3: "Growth is a team effort. Strengthen your standard stations to expand your borders."
+    },
+    2: {
+        1: "All standard stations must be completed to Level 2 before you can upgrade to a Mega Church.",
+        2: "Ensure your Finance and Worship Team are fully upgraded to support thousands.",
+        3: "The harvest requires strong leaders. Growth is locked until your congregation reaches 300 members."
+    },
+    3: {
+        1: "The ultimate expansion requires all standard stations to be completed to Level 3.",
+        2: "A Giga Church is a monumental city-wide sanctuary requiring at least 10,000 members.",
+        3: "Every standard ministry (Level 3) must be active to sustain a congregation of this scale."
+    }
 }
 
 
@@ -360,7 +380,7 @@ async def apply_level_upgrade(
             "new_church_level": group.church_level,
             "tier_name": get_church_tier_name(group.church_level),
             "max_occupancy": new_max_occ,
-            "bonus_pct": round(get_church_bonus(group.church_level) * 100),
+            "bonus_pct": round((await get_group_church_bonus(db, group_id)) * 100),
             "theft_applied": theft_applied,
             "stolen_amount": stolen_amount,
             "actual_gained": actual_gained,
@@ -373,7 +393,7 @@ async def apply_level_upgrade(
     else:
         # Standard station upgrade with earning bonus and max occupancy cap
         earned = old_population * (target.reward_multiplier - 1.0)
-        bonus_pct = get_church_bonus(group.church_level)
+        bonus_pct = await get_group_church_bonus(db, group_id)
         total_earned = earned * (1.0 + bonus_pct)
         new_population = round(old_population + total_earned)
 
@@ -436,6 +456,156 @@ async def get_eligible_steal_targets_for_upgrade(
         }
         for t in targets
     ]
+
+
+async def get_purchased_hint_numbers(
+    db: AsyncSession, group_id: int, station_level_id: int
+) -> list[int]:
+    """Return the list of hint numbers (1, 2, or 3) purchased by this group for this level."""
+    res = await db.execute(
+        select(GroupHintPurchase.hint_number)
+        .where(GroupHintPurchase.group_id == group_id)
+        .where(GroupHintPurchase.station_level_id == station_level_id)
+    )
+    return [row[0] for row in res.all()]
+
+
+async def buy_church_hint(
+    db: AsyncSession, group_id: int, station_level_id: int, hint_number: int
+) -> dict[str, Any]:
+    """
+    Attempt to purchase a hint for a church upgrade level.
+    Base hint costs are Hint 1: 15%, Hint 2: 20%, Hint 3: 25%.
+    The cost drops by 1% for each group that completed the upgrade before you.
+    Enforces the 10-member safety net.
+    """
+    if hint_number not in (1, 2, 3):
+        raise ValueError("Invalid hint number. Must be 1, 2, or 3.")
+
+    # 1. Fetch group
+    group_res = await db.execute(select(Group).where(Group.id == group_id))
+    group = group_res.scalar_one_or_none()
+    if group is None:
+        raise ValueError("Group not found.")
+
+    # 2. Fetch level to verify it's a Church Upgrade
+    level_res = await db.execute(
+        select(StationLevel)
+        .options(selectinload(StationLevel.station))
+        .where(StationLevel.id == station_level_id)
+    )
+    level = level_res.scalar_one_or_none()
+    if level is None or level.station.name != "Church Upgrade":
+        raise ValueError("Hints can only be purchased for Church Upgrades.")
+
+    # 3. Check if already purchased
+    existing_res = await db.execute(
+        select(GroupHintPurchase)
+        .where(GroupHintPurchase.group_id == group_id)
+        .where(GroupHintPurchase.station_level_id == station_level_id)
+        .where(GroupHintPurchase.hint_number == hint_number)
+    )
+    if existing_res.scalar_one_or_none():
+        raise ValueError("This hint has already been purchased.")
+
+    # 4. Fetch N (number of other groups who completed this level before us)
+    completions_res = await db.execute(
+        select(func.count(GroupStationProgress.id))
+        .where(GroupStationProgress.station_level_id == station_level_id)
+    )
+    N = completions_res.scalar() or 0
+
+    # 5. Calculate discounted cost percentage
+    base_percentage = 0.10 + (hint_number * 0.05)  # 15%, 20%, 25%
+    cost_percentage = max(0.01, base_percentage - (N * 0.01))
+    cost = round(group.population * cost_percentage)
+
+    # 6. Validate safety net
+    new_population = group.population - cost
+    if new_population < 10:
+        raise ValueError(
+            "❌ *Purchase Blocked:* Your congregation cannot drop below the 10-member safety net. You do not have enough members to buy this hint."
+        )
+
+    # 7. Record purchase and deduct population
+    purchase = GroupHintPurchase(
+        group_id=group_id,
+        station_level_id=station_level_id,
+        hint_number=hint_number,
+    )
+    db.add(purchase)
+    group.population = new_population
+
+    await db.commit()
+
+    # Get hint text
+    level_num = level.level_number
+    hint_text = CHURCH_HINTS.get(level_num, {}).get(hint_number, "No hint available.")
+
+    return {
+        "cost": cost,
+        "new_population": new_population,
+        "hint_text": hint_text,
+    }
+
+
+async def get_group_church_bonus(db: AsyncSession, group_id: int) -> float:
+    """
+    Calculate the dynamic cumulative church earning bonus for a group.
+    It sums the dynamic rank-based boost earned for each completed Church Upgrade level.
+    Boost = max(1, 15 - N)% where N is the number of groups that upgraded before you (N=13 -> 1%).
+    """
+    # Find the station named "Church Upgrade"
+    station_res = await db.execute(select(Station).where(Station.name == "Church Upgrade"))
+    church_station = station_res.scalar_one_or_none()
+    if not church_station:
+        return 0.0
+
+    # Find all levels of this station
+    levels_res = await db.execute(
+        select(StationLevel.id).where(StationLevel.station_id == church_station.id)
+    )
+    church_level_ids = [row[0] for row in levels_res.all()]
+
+    if not church_level_ids:
+        return 0.0
+
+    # Fetch group's completions for these levels
+    progress_res = await db.execute(
+        select(GroupStationProgress)
+        .where(GroupStationProgress.group_id == group_id)
+        .where(GroupStationProgress.station_level_id.in_(church_level_ids))
+    )
+    completions = progress_res.scalars().all()
+
+    total_boost = 0
+    for comp in completions:
+        # Find all completions for this specific level ordered by completed_at ascending
+        all_comp_res = await db.execute(
+            select(GroupStationProgress)
+            .where(GroupStationProgress.station_level_id == comp.station_level_id)
+            .order_by(GroupStationProgress.completed_at.asc())
+        )
+        all_comps = all_comp_res.scalars().all()
+        
+        # Find index of our group in the ordered completion list
+        rank_idx = 0
+        for idx, c in enumerate(all_comps):
+            if c.group_id == group_id:
+                rank_idx = idx
+                break
+        
+        # Calculate rank-based boost: max(1, 15 - rank_idx)
+        # Special case: 14th group (index 13) gets exactly 1%
+        boost = 15 - rank_idx
+        if rank_idx == 13:
+            boost = 1
+        elif boost < 1:
+            boost = 1
+            
+        total_boost += boost
+
+    return total_boost / 100.0
 
 
 async def get_journey(db: AsyncSession, group_id: int) -> list[dict[str, Any]]:

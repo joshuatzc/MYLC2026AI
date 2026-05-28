@@ -22,12 +22,14 @@ from app.bot.keyboards import (
     admin_eligible_keyboard,
     main_menu_keyboard,
     church_steal_targets_keyboard,
+    church_confirm_keyboard,
+    church_hint_menu_keyboard,
 )
 from app.bot.utils import require_group
 from app.database import AsyncSessionLocal
 from app.models import Group, StationLevel
 from app.services import auth, game_logic
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
 router = Router()
@@ -139,6 +141,8 @@ async def handle_text_input(message: Message) -> None:
 
     if awaiting == "leader_password":
         await _process_leader_password(message, chat_id, message.text or "")
+    elif awaiting == "change_group_password":
+        await _process_change_group_password(message, chat_id, message.text or "")
     elif awaiting == "rename_church":
         await _process_rename_church(message, chat_id, message.text or "")
     else:
@@ -170,6 +174,35 @@ async def _process_leader_password(
             "❌ Incorrect password. Please try again or tap another button.",
             reply_markup=main_menu_keyboard(role),
         )
+
+
+async def _process_change_group_password(
+    message: Message, chat_id: str, password: str
+) -> None:
+    from app.config import settings
+    from app.bot.keyboards import groups_inline_keyboard
+
+    if password != settings.LEADER_PASSWORD:
+        async with AsyncSessionLocal() as db:
+            role = await auth.get_role(db, chat_id)
+        await message.answer(
+            "❌ Incorrect password. Please try again or tap another button.",
+            reply_markup=main_menu_keyboard(role),
+        )
+        return
+
+    async with AsyncSessionLocal() as db:
+        await auth.set_awaiting(db, chat_id, None)
+        groups = await game_logic.list_groups(db)
+
+    if not groups:
+        await message.answer("No groups available yet. Ask the admin to add some.")
+        return
+
+    await message.answer(
+        "Select your group:",
+        reply_markup=groups_inline_keyboard(groups),
+    )
 
 
 async def _process_rename_church(
@@ -302,13 +335,29 @@ async def cb_admin_upgrade_detail(callback: CallbackQuery) -> None:
                 reply_markup=admin_eligible_keyboard([]),
             )
         else:
+            # Calculate rank-based next_boost
+            completions_count = await db.execute(
+                select(func.count(GroupStationProgress.id))
+                .where(GroupStationProgress.station_level_id == level_id)
+            )
+            N = completions_count.scalar() or 0
+            
+            next_boost = 15 - N
+            if N == 13:
+                next_boost = 1
+            elif next_boost < 1:
+                next_boost = 1
+                
+            current_bonus_pct = round((await game_logic.get_group_church_bonus(db, group_id)) * 100)
+            
             text = (
                 f"🏛️ *Confirm Church Upgrade* 🏛️\n"
                 f"━━━━━━━━━━━━━━━━━━━\n"
                 f"Upgrade: *Church Upgrade – Level {new_level} ({new_tier})*\n\n"
+                f"⚠️ *WARNING:* (CONFIRM Only if u passed the STATION)\n\n"
                 f"👥 Current Population: **{int(group.population):,}** (Min required: {min_pop})\n"
                 f"👥 New Max Occupancy: **{new_max:,}**\n"
-                f"📈 Station Earning Bonus: **+{round(game_logic.get_church_bonus(new_level)*100)}%**\n"
+                f"📈 Station Earning Bonus: **+{current_bonus_pct}%** (`+{next_boost}%` if upgraded now! 🏆)\n"
                 f"⚡ *Special Perk:* Steal up to **{steal_amt}** members from any group at **{current_tier}**!\n\n"
                 f"💡 Hint: _{level.hint_text}_\n\n"
                 f"Are you sure you want to upgrade your church?"
@@ -316,7 +365,7 @@ async def cb_admin_upgrade_detail(callback: CallbackQuery) -> None:
             await callback.message.edit_text(
                 text,
                 parse_mode="Markdown",
-                reply_markup=admin_confirm_keyboard(level_id),
+                reply_markup=church_confirm_keyboard(level_id),
             )
     else:
         new_pop = round(group.population * level.reward_multiplier)
@@ -476,3 +525,138 @@ async def cb_admin_church_confirm(callback: CallbackQuery) -> None:
         reply_markup=None,
     )
     await callback.answer("Church upgraded successfully!")
+
+
+# ---------------------------------------------------------------------------
+# Church Upgrade Hint Handlers
+# ---------------------------------------------------------------------------
+
+@router.callback_query(F.data.startswith("admin_church_hint_menu:"))
+async def cb_admin_church_hint_menu(callback: CallbackQuery) -> None:
+    parts = callback.data.split(":")
+    level_id = int(parts[1])
+    chat_id = str(callback.message.chat.id)
+
+    async with AsyncSessionLocal() as db:
+        group_id = await auth.get_current_group_id(db, chat_id)
+        if group_id is None:
+            await callback.answer("No group selected.", show_alert=True)
+            return
+
+        group = await _fetch_group(db, group_id)
+        level = await _fetch_level(db, level_id)
+
+        if group is None or level is None:
+            await callback.answer("Data not found.", show_alert=True)
+            return
+
+        # Get count of other groups who completed this level
+        completions_count = await db.execute(
+            select(func.count(GroupStationProgress.id))
+            .where(GroupStationProgress.station_level_id == level_id)
+        )
+        N = completions_count.scalar() or 0
+
+        # Get already purchased hints
+        purchased = await game_logic.get_purchased_hint_numbers(db, group_id, level_id)
+
+    level_num = level.level_number
+    current_pop = group.population
+
+    # Build the Hint Menu text dynamically
+    text = (
+        f"💡 *Church Upgrade Hint Menu* 💡\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"Upgrade: *Church Upgrade – Level {level_num} ({game_logic.get_church_tier_name(level_num)})*\n"
+        f"👥 Current Congregation: **{int(current_pop):,}** members\n\n"
+        f"Unlock progressive hints at the cost of a percentage of your population. "
+        f"Every previous completion by another group reduces costs by **1%**! Once purchased, you can view the hint forever.\n\n"
+    )
+
+    for hint_num in (1, 2, 3):
+        base_percentage = 0.10 + (hint_num * 0.05)  # 15%, 20%, 25%
+        cost_percentage = max(0.01, base_percentage - (N * 0.01))
+        cost = round(current_pop * cost_percentage)
+
+        if hint_num in purchased:
+            hint_content = game_logic.CHURCH_HINTS.get(level_num, {}).get(hint_num, "No hint available.")
+            text += f"{hint_num}️⃣ **Hint {hint_num}** (Unlocked ✅)\n   📖 *\"{hint_content}\"*\n\n"
+        else:
+            text += f"{hint_num}️⃣ **Hint {hint_num}** (Locked 🔒 — Costs {round(cost_percentage*100)}% pop: **{cost:,}** members)\n\n"
+
+    kb = church_hint_menu_keyboard(level_id, purchased, current_pop, N)
+
+    await callback.message.edit_text(
+        text,
+        parse_mode="Markdown",
+        reply_markup=kb,
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("admin_church_hint_buy:"))
+async def cb_admin_church_hint_buy(callback: CallbackQuery) -> None:
+    parts = callback.data.split(":")
+    level_id = int(parts[1])
+    hint_number = int(parts[2])
+    chat_id = str(callback.message.chat.id)
+
+    async with AsyncSessionLocal() as db:
+        group_id = await auth.get_current_group_id(db, chat_id)
+        if group_id is None:
+            await callback.answer("No group selected.", show_alert=True)
+            return
+
+        try:
+            result = await game_logic.buy_church_hint(db, group_id, level_id, hint_number)
+        except ValueError as exc:
+            # Show the error as an alert popup (like population safety net hit or already bought)
+            await callback.answer(str(exc), show_alert=True)
+            return
+
+        # Fetch updated completions count N
+        completions_count = await db.execute(
+            select(func.count(GroupStationProgress.id))
+            .where(GroupStationProgress.station_level_id == level_id)
+        )
+        N = completions_count.scalar() or 0
+
+        # Fetch updated purchased list
+        purchased = await game_logic.get_purchased_hint_numbers(db, group_id, level_id)
+        group = await _fetch_group(db, group_id)
+        level = await _fetch_level(db, level_id)
+
+    # Let's show a success popup alert first
+    await callback.answer(f"🎉 Hint {hint_number} successfully unlocked! (-{result['cost']} population)", show_alert=True)
+
+    # Refresh the Hint Menu text and buttons in-place!
+    level_num = level.level_number
+    current_pop = group.population
+
+    text = (
+        f"💡 *Church Upgrade Hint Menu* 💡\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"Upgrade: *Church Upgrade – Level {level_num} ({game_logic.get_church_tier_name(level_num)})*\n"
+        f"👥 Current Congregation: **{int(current_pop):,}** members\n\n"
+        f"Unlock progressive hints at the cost of a percentage of your population. "
+        f"Every previous completion by another group reduces costs by **1%**! Once purchased, you can view the hint forever.\n\n"
+    )
+
+    for hint_num in (1, 2, 3):
+        base_percentage = 0.10 + (hint_num * 0.05)  # 15%, 20%, 25%
+        cost_percentage = max(0.01, base_percentage - (N * 0.01))
+        cost = round(current_pop * cost_percentage)
+
+        if hint_num in purchased:
+            hint_content = game_logic.CHURCH_HINTS.get(level_num, {}).get(hint_num, "No hint available.")
+            text += f"{hint_num}️⃣ **Hint {hint_num}** (Unlocked ✅)\n   📖 *\"{hint_content}\"*\n\n"
+        else:
+            text += f"{hint_num}️⃣ **Hint {hint_num}** (Locked 🔒 — Costs {round(cost_percentage*100)}% pop: **{cost:,}** members)\n\n"
+
+    kb = church_hint_menu_keyboard(level_id, purchased, current_pop, N)
+
+    await callback.message.edit_text(
+        text,
+        parse_mode="Markdown",
+        reply_markup=kb,
+    )

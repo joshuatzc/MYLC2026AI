@@ -31,7 +31,7 @@ async def handle_my_church(message: Message) -> None:
 
         tier_name = game_logic.get_church_tier_name(group.church_level)
         max_occupancy = game_logic.get_max_occupancy(group.church_level)
-        bonus_pct = round(game_logic.get_church_bonus(group.church_level) * 100)
+        bonus_pct = round((await game_logic.get_group_church_bonus(db, group_id)) * 100)
 
     # Visual progress bar calculation
     percentage = min(1.0, group.population / max_occupancy)

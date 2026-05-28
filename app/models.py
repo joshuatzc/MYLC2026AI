@@ -212,6 +212,23 @@ class StealRecord(Base):
         )
 
 
+class GroupHintPurchase(Base):
+    __tablename__ = "group_hint_purchases"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    group_id = Column(Integer, ForeignKey("groups.id"), nullable=False)
+    station_level_id = Column(Integer, ForeignKey("station_levels.id"), nullable=False)
+    hint_number = Column(Integer, nullable=False)  # 1, 2, or 3
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("group_id", "station_level_id", "hint_number", name="uq_group_level_hint_purchase"),
+    )
+
+    group = relationship("Group", foreign_keys=[group_id])
+    station_level = relationship("StationLevel", foreign_keys=[station_level_id])
+
+
 # ---------------------------------------------------------------------------
 # Chat state (Telegram)
 # ---------------------------------------------------------------------------
