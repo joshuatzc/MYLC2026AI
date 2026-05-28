@@ -23,7 +23,6 @@ from app.bot.keyboards import (
     main_menu_keyboard,
     church_steal_targets_keyboard,
     church_confirm_keyboard,
-    church_hint_menu_keyboard,
 )
 from app.bot.utils import require_group
 from app.database import AsyncSessionLocal
