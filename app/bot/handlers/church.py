@@ -67,6 +67,25 @@ async def handle_my_church(message: Message) -> None:
             f"  • {status_symbol} Required population: *{min_pop}* (Current: *{int(group.population)}*)\n"
             f"  • ⚡ Perk: Steal **{steal_amt}** members from a **{tier_name}** at upgrade time!"
         )
+        
+        # Display purchased hints for this next level
+        async with AsyncSessionLocal() as db:
+            from app.models import StationLevel, Station
+            levels_res = await db.execute(
+                select(StationLevel)
+                .join(StationLevel.station)
+                .where(Station.name == "Church Upgrade")
+                .where(StationLevel.level_number == next_level)
+            )
+            next_level_obj = levels_res.scalar_one_or_none()
+            
+            if next_level_obj:
+                purchased = await game_logic.get_purchased_hint_numbers(db, group.id, next_level_obj.id)
+                if purchased:
+                    lines.append(f"\n💡 *Unlocked hints for {next_tier_name}:*")
+                    for h_num in sorted(purchased):
+                        hint_text = game_logic.CHURCH_HINTS.get(next_level, {}).get(h_num, "No hint available.")
+                        lines.append(f"  • *Hint {h_num}:* {hint_text}")
     else:
         lines.append(f"\n🎉 *Maximum Church Tier reached!* You have unlocked the legendary Giga Sanctuary.")
 

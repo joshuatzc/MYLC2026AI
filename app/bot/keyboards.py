@@ -154,57 +154,19 @@ def church_steal_targets_keyboard(level_id: int, targets: list[dict]) -> InlineK
     return builder.as_markup()
 
 
-def church_confirm_keyboard(level_id: int) -> InlineKeyboardMarkup:
+def church_confirm_keyboard(
+    level_id: int, next_hint_num: int | None = None, cost_pct: int = 0
+) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(
         text="✅ Yes, confirm",
         callback_data=f"admin_confirm:{level_id}",
     )
-    builder.button(
-        text="💡 Buy Hint",
-        callback_data=f"admin_church_hint_menu:{level_id}",
-    )
+    if next_hint_num is not None:
+        builder.button(
+            text=f"💡 Buy Hint {next_hint_num} (-{cost_pct}% population)",
+            callback_data=f"admin_church_hint_buy:{level_id}:{next_hint_num}",
+        )
     builder.button(text="❌ Cancel", callback_data="admin_section")
-    builder.adjust(1)
-    return builder.as_markup()
-
-
-def church_hint_menu_keyboard(
-    level_id: int, purchased: list[int], current_pop: float, N: int
-) -> InlineKeyboardMarkup:
-    builder = InlineKeyboardBuilder()
-
-    # Hint 1: 15% base, less 1% per previous completion
-    if 1 not in purchased:
-        cost_pct = max(0.01, 0.15 - (N * 0.01))
-        cost_1 = round(current_pop * cost_pct)
-        builder.button(
-            text=f"🔓 Buy Hint 1 (-{cost_1} pop, {round(cost_pct*100)}%)",
-            callback_data=f"admin_church_hint_buy:{level_id}:1",
-        )
-
-    # Hint 2: 20% base, less 1% per previous completion
-    if 2 not in purchased:
-        cost_pct = max(0.01, 0.20 - (N * 0.01))
-        cost_2 = round(current_pop * cost_pct)
-        builder.button(
-            text=f"🔓 Buy Hint 2 (-{cost_2} pop, {round(cost_pct*100)}%)",
-            callback_data=f"admin_church_hint_buy:{level_id}:2",
-        )
-
-    # Hint 3: 25% base, less 1% per previous completion
-    if 3 not in purchased:
-        cost_pct = max(0.01, 0.25 - (N * 0.01))
-        cost_3 = round(current_pop * cost_pct)
-        builder.button(
-            text=f"🔓 Buy Hint 3 (-{cost_3} pop, {round(cost_pct*100)}%)",
-            callback_data=f"admin_church_hint_buy:{level_id}:3",
-        )
-
-    builder.adjust(1)
-    builder.button(
-        text="← Back to Upgrade",
-        callback_data=f"admin_upgrade_detail:{level_id}",
-    )
     builder.adjust(1)
     return builder.as_markup()
