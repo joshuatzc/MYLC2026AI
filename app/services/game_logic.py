@@ -141,9 +141,15 @@ async def get_eligible_levels(
     Return station levels that:
     - are NOT yet completed by this group
     - have ALL prerequisites satisfied
+    - for Church Upgrade, also meet the population requirement
     """
     completed = await _completed_level_ids(db, group_id)
     all_levels = await _all_levels(db)
+
+    # Fetch group to check population (needed for Church Upgrade population requirements)
+    group_result = await db.execute(select(Group).where(Group.id == group_id))
+    group = group_result.scalar_one_or_none()
+    group_pop = group.population if group else 0.0
 
     eligible = []
     for level in all_levels:
@@ -151,6 +157,11 @@ async def get_eligible_levels(
             continue
         prereqs = await _resolve_implicit_prereqs(level, all_levels)
         if all(pid in completed for pid in prereqs):
+            # Enforce population check on Church Upgrade eligibility!
+            if level.station.name == "Church Upgrade":
+                min_pop = get_church_min_pop(level.level_number)
+                if group_pop < min_pop:
+                    continue
             eligible.append(_level_to_dict(level))
 
     return eligible

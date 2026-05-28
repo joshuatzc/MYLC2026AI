@@ -21,7 +21,6 @@ from app.bot.keyboards import (
     admin_confirm_keyboard,
     admin_eligible_keyboard,
     main_menu_keyboard,
-    admin_after_upgrade_keyboard,
     church_steal_targets_keyboard,
 )
 from app.bot.utils import require_group
@@ -380,6 +379,7 @@ async def cb_admin_confirm(callback: CallbackQuery) -> None:
                 f"━━━━━━━━━━━━━━━━━━━\n"
                 f"You are upgrading to a **{new_tier}**!\n"
                 f"This permits a one-time absolute theft of up to **{steal_amt}** members from any group at your current tier (**{current_tier}**).\n\n"
+                f"⚠️ *Safety Net:* You can only steal from a group until they have **10 members** remaining. They will never go below this 10-member safety net.\n\n"
                 f"Select a group to steal from, or skip the theft to upgrade immediately:"
             )
             kb = church_steal_targets_keyboard(level_id, targets)
@@ -412,7 +412,7 @@ async def cb_admin_confirm(callback: CallbackQuery) -> None:
         await callback.message.edit_text(
             text,
             parse_mode="Markdown",
-            reply_markup=admin_after_upgrade_keyboard(),
+            reply_markup=None,
         )
         await callback.answer("Upgrade applied!")
 
@@ -473,6 +473,6 @@ async def cb_admin_church_confirm(callback: CallbackQuery) -> None:
     await callback.message.edit_text(
         text,
         parse_mode="Markdown",
-        reply_markup=admin_after_upgrade_keyboard(),
+        reply_markup=None,
     )
     await callback.answer("Church upgraded successfully!")

@@ -142,17 +142,13 @@ def church_steal_targets_keyboard(level_id: int, targets: list[dict]) -> InlineK
     builder = InlineKeyboardBuilder()
     for t in targets:
         builder.button(
-            text=f"⚡ Steal from {t['name']} ({t['population']} pop)",
+            text=f"⚡ Steal from {t['name']}",
             callback_data=f"admin_church_confirm:{level_id}:{t['id']}",
         )
     builder.adjust(1)
     builder.button(
         text="⏩ Skip Theft (Upgrade Only)",
         callback_data=f"admin_church_confirm:{level_id}:skip",
-    )
-    builder.button(
-        text="❌ Cancel Upgrade",
-        callback_data="admin_section",
     )
     builder.adjust(1)
     return builder.as_markup()
