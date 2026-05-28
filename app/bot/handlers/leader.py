@@ -27,7 +27,7 @@ from app.bot.keyboards import (
 )
 from app.bot.utils import require_group
 from app.database import AsyncSessionLocal
-from app.models import Group, StationLevel
+from app.models import Group, StationLevel, GroupStationProgress
 from app.services import auth, game_logic
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
