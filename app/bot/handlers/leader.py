@@ -567,5 +567,16 @@ async def cb_admin_church_hint_buy(callback: CallbackQuery) -> None:
     # Silent toast message
     await callback.answer(f"🎉 Hint {hint_number} purchased successfully! (-{result['cost']} pop)")
 
-    # Refresh the upgrade detail in-place
-    await cb_admin_upgrade_detail(callback)
+    # Edit the message to say hint bought, check My Church, and remove all inline buttons
+    text = (
+        f"✅ *Hint Purchased!* 💡\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"You have successfully purchased **Hint {hint_number}** for this Church Upgrade (-{result['cost']} congregation members).\n\n"
+        f"👥 New Congregation: **{int(result['new_population']):,}** members\n\n"
+        f"📖 *Check 'My Church':* The hint is now permanently visible to all your group members in the **My Church** panel on your main keyboards!"
+    )
+    await callback.message.edit_text(
+        text,
+        parse_mode="Markdown",
+        reply_markup=None,
+    )
