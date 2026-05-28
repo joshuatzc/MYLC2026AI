@@ -19,13 +19,14 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 def main_menu_keyboard(role: str = "normal") -> ReplyKeyboardMarkup:
     """Build the persistent reply keyboard based on the chat's current role."""
     rows = [
-        [KeyboardButton(text="My Journey"), KeyboardButton(text="Check Prerequisites")],
-        [KeyboardButton(text="Leaderboard"), KeyboardButton(text="Change Group")],
+        [KeyboardButton(text="My Church"), KeyboardButton(text="My Journey")],
+        [KeyboardButton(text="Check Prerequisites"), KeyboardButton(text="Leaderboard")],
+        [KeyboardButton(text="Change Group")],
     ]
     if role == "leader":
-        rows.append([KeyboardButton(text="Admin Section")])
+        rows[-1].append(KeyboardButton(text="Admin Section"))
     else:
-        rows.append([KeyboardButton(text="Become Leader")])
+        rows[-1].append(KeyboardButton(text="Become Leader"))
 
     return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
 
@@ -101,6 +102,14 @@ def locked_detail_keyboard() -> InlineKeyboardMarkup:
 # Inline keyboards – Admin Section
 # ---------------------------------------------------------------------------
 
+def admin_main_keyboard() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="⬆️ Record Station Upgrade", callback_data="admin_record_upgrade_list")
+    builder.button(text="🏠 Back to Main Menu", callback_data="main_menu")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
 def admin_eligible_keyboard(eligible: list[dict]) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     for lv in eligible:
@@ -109,7 +118,7 @@ def admin_eligible_keyboard(eligible: list[dict]) -> InlineKeyboardMarkup:
             callback_data=f"admin_upgrade_detail:{lv['id']}",
         )
     builder.adjust(1)
-    builder.button(text="❌ Cancel", callback_data="admin_cancel")
+    builder.button(text="← Back to Admin Menu", callback_data="admin_section")
     builder.adjust(1)
     return builder.as_markup()
 
@@ -120,14 +129,35 @@ def admin_confirm_keyboard(level_id: int) -> InlineKeyboardMarkup:
         text="✅ Yes, confirm",
         callback_data=f"admin_confirm:{level_id}",
     )
-    builder.button(text="❌ Cancel", callback_data="admin_cancel")
+    builder.button(text="❌ Cancel", callback_data="admin_section")
     builder.adjust(1)
     return builder.as_markup()
 
 
 def admin_after_upgrade_keyboard() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    builder.button(text="⬆️ Mark another upgrade", callback_data="admin_section")
+    builder.button(text="⬆️ Mark another upgrade", callback_data="admin_record_upgrade_list")
+    builder.button(text="← Back to Admin Menu", callback_data="admin_section")
     builder.button(text="🏠 Back to Main Menu", callback_data="main_menu")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def church_steal_targets_keyboard(level_id: int, targets: list[dict]) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for t in targets:
+        builder.button(
+            text=f"⚡ Steal from {t['name']} ({t['population']} pop)",
+            callback_data=f"admin_church_confirm:{level_id}:{t['id']}",
+        )
+    builder.adjust(1)
+    builder.button(
+        text="⏩ Skip Theft (Upgrade Only)",
+        callback_data=f"admin_church_confirm:{level_id}:skip",
+    )
+    builder.button(
+        text="❌ Cancel Upgrade",
+        callback_data="admin_record_upgrade_list",
+    )
     builder.adjust(1)
     return builder.as_markup()

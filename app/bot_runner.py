@@ -10,7 +10,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
-from app.bot.handlers import common, journey, leader, prerequisites
+from app.bot.handlers import common, journey, leader, prerequisites, church
 from app.config import settings
 
 
@@ -28,6 +28,7 @@ def create_dispatcher() -> Dispatcher:
     # common must come before leader so the catch-all text handler in
     # leader.py only fires when no named button matches.
     dp.include_router(common.router)
+    dp.include_router(church.router)
     dp.include_router(journey.router)
     dp.include_router(prerequisites.router)
     dp.include_router(leader.router)

@@ -18,7 +18,40 @@ from app.models import (
     GroupStationProgress,
     StationLevel,
     StationLevelPrerequisite,
+    StealRecord,
 )
+
+
+# ---------------------------------------------------------------------------
+# Church Upgrade Configuration & Helpers
+# ---------------------------------------------------------------------------
+
+CHURCH_TIERS = {
+    0: {"name": "Home Church", "max_occupancy": 30, "bonus": 0.0, "min_population": 0, "steal_amount": 0},
+    1: {"name": "Family Church", "max_occupancy": 500, "bonus": 0.10, "min_population": 15, "steal_amount": 15},
+    2: {"name": "Mega Church", "max_occupancy": 10000, "bonus": 0.20, "min_population": 300, "steal_amount": 150},
+    3: {"name": "Giga Church", "max_occupancy": 10000000, "bonus": 0.30, "min_population": 10000, "steal_amount": 2000},
+}
+
+
+def get_max_occupancy(level: int) -> int:
+    return CHURCH_TIERS.get(level, CHURCH_TIERS[3])["max_occupancy"]
+
+
+def get_church_bonus(level: int) -> float:
+    return CHURCH_TIERS.get(level, CHURCH_TIERS[3])["bonus"]
+
+
+def get_church_tier_name(level: int) -> str:
+    return CHURCH_TIERS.get(level, CHURCH_TIERS[3])["name"]
+
+
+def get_church_min_pop(level: int) -> int:
+    return CHURCH_TIERS.get(level, CHURCH_TIERS[3])["min_population"]
+
+
+def get_church_steal_amount(level: int) -> int:
+    return CHURCH_TIERS.get(level, CHURCH_TIERS[3])["steal_amount"]
 
 
 # ---------------------------------------------------------------------------
@@ -175,6 +208,7 @@ async def apply_level_upgrade(
     group_id: int,
     station_level_id: int,
     recorded_by: str | None = None,
+    steal_target_group_id: int | None = None,
 ) -> dict[str, Any]:
     """
     Apply a level upgrade for a group.
@@ -182,6 +216,8 @@ async def apply_level_upgrade(
     Raises ValueError if:
     - The level is already completed.
     - Prerequisites are not satisfied.
+    - Church Upgrade: group's current population is below minimum requirements.
+    - Church Upgrade: selected theft target's level is not exactly equal to stealer's old level.
 
     Returns a dict with upgrade details.
     """
@@ -208,26 +244,154 @@ async def apply_level_upgrade(
         raise ValueError(f"Group id={group_id} not found.")
 
     old_population = group.population
-    new_population = round(old_population * target.reward_multiplier)
 
-    progress = GroupStationProgress(
-        group_id=group_id,
-        station_level_id=station_level_id,
-        completed_at=datetime.utcnow(),
-        population_after=new_population,
-        recorded_by=recorded_by,
-    )
-    db.add(progress)
-    group.population = new_population
-    await db.commit()
+    if target.station.name == "Church Upgrade":
+        # Upgrades the group's church level to the level number of this physical station upgrade
+        new_church_level = target.level_number
+        if group.church_level >= new_church_level:
+            raise ValueError(f"Church already at level {group.church_level} ({get_church_tier_name(group.church_level)}).")
+        
+        # Sequentially upgrade
+        if new_church_level != group.church_level + 1:
+            raise ValueError(f"Cannot upgrade directly to Level {new_church_level}. You must upgrade to Level {group.church_level + 1} first.")
 
-    return {
-        "station_name": target.station.name,
-        "level_number": target.level_number,
-        "old_population": old_population,
-        "new_population": new_population,
-        "multiplier": target.reward_multiplier,
-    }
+        # Prerequisite minimum population check
+        min_pop = get_church_min_pop(new_church_level)
+        if old_population < min_pop:
+            raise ValueError(
+                f"❌ Your group needs at least {min_pop} congregation members to upgrade to a {get_church_tier_name(new_church_level)}! "
+                f"Current population: {int(old_population):,}."
+            )
+
+        stolen_amount = 0
+        actual_gained = 0
+        target_name = None
+        target_old_pop = 0
+        target_new_pop = 0
+        theft_applied = False
+
+        # Apply absolute steal with safety net at upgrade time
+        if steal_target_group_id is not None:
+            target_res = await db.execute(select(Group).where(Group.id == steal_target_group_id))
+            target_group = target_res.scalar_one_or_none()
+            if target_group is None:
+                raise ValueError("Selected theft target group not found.")
+
+            # Victim must be at the stealer's CURRENT level (which is strictly 1 level below the new upgraded level!)
+            if target_group.church_level != group.church_level:
+                raise ValueError(
+                    f"You can only steal from groups currently at your tier ({get_church_tier_name(group.church_level)})! "
+                    f"Target is at {get_church_tier_name(target_group.church_level)}."
+                )
+
+            # Absolute steal amount for this upgrade level
+            absolute_steal = get_church_steal_amount(new_church_level)
+
+            # Victim cannot go below 10 members safety net
+            max_stolen = max(0.0, target_group.population - 10.0)
+            stolen_amount = round(min(float(absolute_steal), max_stolen))
+
+            if stolen_amount > 0:
+                target_name = target_group.name
+                target_old_pop = target_group.population
+                
+                # Deduct from target
+                target_group.population = max(10.0, target_group.population - stolen_amount)
+                target_new_pop = target_group.population
+
+                # Stealer temporary population (will be capped below by new occupancy limit)
+                # Group current population remains old_population for calculation of actual gained members.
+                old_population_post_steal = old_population + stolen_amount
+                
+                record = StealRecord(
+                    stealer_group_id=group_id,
+                    target_group_id=steal_target_group_id,
+                    amount=stolen_amount,
+                    created_at=datetime.utcnow(),
+                    recorded_by=recorded_by,
+                )
+                db.add(record)
+                theft_applied = True
+            else:
+                old_population_post_steal = old_population
+        else:
+            old_population_post_steal = old_population
+
+        group.church_level = new_church_level
+
+        # Max occupancy changes, cap their current population
+        new_max_occ = get_max_occupancy(group.church_level)
+        new_population = min(new_max_occ, old_population_post_steal)
+        
+        if theft_applied:
+            # Actual gained members after occupancy capping is applied
+            actual_gained = max(0, new_population - old_population)
+
+        group.population = new_population
+
+        progress = GroupStationProgress(
+            group_id=group_id,
+            station_level_id=station_level_id,
+            completed_at=datetime.utcnow(),
+            population_after=new_population,
+            recorded_by=recorded_by,
+        )
+        db.add(progress)
+        await db.commit()
+
+        return {
+            "station_name": target.station.name,
+            "level_number": target.level_number,
+            "old_population": old_population,
+            "new_population": new_population,
+            "multiplier": 1.0,
+            "church_upgraded": True,
+            "new_church_level": group.church_level,
+            "tier_name": get_church_tier_name(group.church_level),
+            "max_occupancy": new_max_occ,
+            "bonus_pct": round(get_church_bonus(group.church_level) * 100),
+            "theft_applied": theft_applied,
+            "stolen_amount": stolen_amount,
+            "actual_gained": actual_gained,
+            "target_name": target_name,
+            "target_old_pop": target_old_pop,
+            "target_new_pop": target_new_pop,
+            "min_required": min_pop,
+            "capped": theft_applied and (old_population_post_steal > new_max_occ),
+        }
+    else:
+        # Standard station upgrade with earning bonus and max occupancy cap
+        earned = old_population * (target.reward_multiplier - 1.0)
+        bonus_pct = get_church_bonus(group.church_level)
+        total_earned = earned * (1.0 + bonus_pct)
+        new_population = round(old_population + total_earned)
+
+        # Cap based on max occupancy of current church level
+        max_occ = get_max_occupancy(group.church_level)
+        capped = new_population > max_occ
+        new_population = min(max_occ, new_population)
+
+        progress = GroupStationProgress(
+            group_id=group_id,
+            station_level_id=station_level_id,
+            completed_at=datetime.utcnow(),
+            population_after=new_population,
+            recorded_by=recorded_by,
+        )
+        db.add(progress)
+        group.population = new_population
+        await db.commit()
+
+        return {
+            "station_name": target.station.name,
+            "level_number": target.level_number,
+            "old_population": old_population,
+            "new_population": new_population,
+            "multiplier": target.reward_multiplier,
+            "church_upgraded": False,
+            "earned_bonus": total_earned - earned,
+            "capped": capped,
+        }
 
 
 async def get_group_population(db: AsyncSession, group_id: int) -> int:
@@ -238,10 +402,36 @@ async def get_group_population(db: AsyncSession, group_id: int) -> int:
     return int(row)
 
 
+async def get_eligible_steal_targets_for_upgrade(
+    db: AsyncSession,
+    group_id: int,
+    current_church_level: int,
+) -> list[dict[str, Any]]:
+    """Return all other groups whose church level is exactly equal to current_church_level."""
+    res = await db.execute(
+        select(Group)
+        .where(Group.id != group_id)
+        .where(Group.church_level == current_church_level)
+        .order_by(Group.name)
+    )
+    targets = res.scalars().all()
+    return [
+        {
+            "id": t.id,
+            "name": t.name,
+            "population": int(t.population),
+            "church_level": t.church_level,
+            "tier_name": get_church_tier_name(t.church_level),
+        }
+        for t in targets
+    ]
+
+
 async def get_journey(db: AsyncSession, group_id: int) -> list[dict[str, Any]]:
     """
-    Return ordered progress entries for the group, joined with station/level data.
+    Return ordered progress entries and steal entries for the group, compiled into a single timeline.
     """
+    # Fetch station progress
     result = await db.execute(
         select(GroupStationProgress)
         .options(
@@ -253,15 +443,64 @@ async def get_journey(db: AsyncSession, group_id: int) -> list[dict[str, Any]]:
         .order_by(GroupStationProgress.completed_at)
     )
     rows = result.scalars().all()
-    return [
-        {
+
+    # Fetch steals committed
+    stealer_res = await db.execute(
+        select(StealRecord)
+        .options(selectinload(StealRecord.target_group))
+        .where(StealRecord.stealer_group_id == group_id)
+    )
+    steals_committed = stealer_res.scalars().all()
+
+    # Fetch steals suffered
+    target_res = await db.execute(
+        select(StealRecord)
+        .options(selectinload(StealRecord.stealer_group))
+        .where(StealRecord.target_group_id == group_id)
+    )
+    steals_suffered = target_res.scalars().all()
+
+    events = []
+
+    # Add station completions
+    for row in rows:
+        events.append({
+            "timestamp": row.completed_at,
+            "type": "upgrade",
+            "completed_at": row.completed_at.strftime("%Y-%m-%d %H:%M UTC"),
             "station_name": row.station_level.station.name,
             "level_number": row.station_level.level_number,
-            "completed_at": row.completed_at.strftime("%Y-%m-%d %H:%M UTC"),
             "population_after": row.population_after,
-        }
-        for row in rows
-    ]
+        })
+
+    # Add steals committed
+    for row in steals_committed:
+        events.append({
+            "timestamp": row.created_at,
+            "type": "theft_committed",
+            "completed_at": row.created_at.strftime("%Y-%m-%d %H:%M UTC"),
+            "target_name": row.target_group.name,
+            "amount": row.amount,
+        })
+
+    # Add steals suffered
+    for row in steals_suffered:
+        events.append({
+            "timestamp": row.created_at,
+            "type": "theft_suffered",
+            "completed_at": row.created_at.strftime("%Y-%m-%d %H:%M UTC"),
+            "stealer_name": row.stealer_group.name,
+            "amount": row.amount,
+        })
+
+    # Sort chronologically
+    events.sort(key=lambda e: e["timestamp"])
+
+    # Remove the timestamp object before returning
+    for e in events:
+        e.pop("timestamp", None)
+
+    return events
 
 
 async def get_leaderboard(db: AsyncSession) -> list[dict[str, Any]]:

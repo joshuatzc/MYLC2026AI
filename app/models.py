@@ -39,6 +39,8 @@ class Group(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(100), unique=True, nullable=False)
     population = Column(Float, nullable=False, default=10)
+    church_level = Column(Integer, nullable=False, default=0)
+    steal_charges = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
 
     # relationships
@@ -183,6 +185,30 @@ class GroupStationProgress(Base):
         return (
             f"<GroupStationProgress group={self.group_id}"
             f" level={self.station_level_id} pop_after={self.population_after}>"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Stealing records
+# ---------------------------------------------------------------------------
+
+class StealRecord(Base):
+    __tablename__ = "steal_records"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    stealer_group_id = Column(Integer, ForeignKey("groups.id"), nullable=False)
+    target_group_id = Column(Integer, ForeignKey("groups.id"), nullable=False)
+    amount = Column(Integer, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    recorded_by = Column(String(100), nullable=True)
+
+    stealer_group = relationship("Group", foreign_keys=[stealer_group_id])
+    target_group = relationship("Group", foreign_keys=[target_group_id])
+
+    def __repr__(self) -> str:
+        return (
+            f"<StealRecord id={self.id} stealer={self.stealer_group_id} "
+            f"target={self.target_group_id} amount={self.amount}>"
         )
 
 

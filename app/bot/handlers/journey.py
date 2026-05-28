@@ -38,14 +38,34 @@ async def handle_my_journey(message: Message) -> None:
     ]
 
     if not history:
-        lines.append("_No upgrades completed yet._")
+        lines.append("_No history recorded yet._")
     else:
-        lines.append("📜 *Upgrade History:*")
+        lines.append("📜 *Timeline of Journey:*")
         for i, entry in enumerate(history, 1):
-            lines.append(
-                f"{i}. {entry['station_name']} – Level {entry['level_number']}\n"
-                f"   ✅ {entry['completed_at']}\n"
-                f"   👥 Population after: {int(entry['population_after']):,}"
-            )
+            if entry["type"] == "upgrade":
+                if entry["station_name"] == "Church Upgrade":
+                    lines.append(
+                        f"{i}. 🏛️ *{entry['station_name']} – Level {entry['level_number']}*\n"
+                        f"   ✅ {entry['completed_at']}\n"
+                        f"   👥 Population: {int(entry['population_after']):,}"
+                    )
+                else:
+                    lines.append(
+                        f"{i}. ⛪ *{entry['station_name']} – Level {entry['level_number']}*\n"
+                        f"   ✅ {entry['completed_at']}\n"
+                        f"   👥 Population: {int(entry['population_after']):,}"
+                    )
+            elif entry["type"] == "theft_committed":
+                lines.append(
+                    f"{i}. ⚡ *Congregation Theft*\n"
+                    f"   ✅ {entry['completed_at']}\n"
+                    f"   👥 Stole *{int(entry['amount']):,}* members from *{entry['target_name']}*"
+                )
+            elif entry["type"] == "theft_suffered":
+                lines.append(
+                    f"{i}. ⚠️ *Theft Suffered*\n"
+                    f"   🚨 {entry['completed_at']}\n"
+                    f"   👥 *{entry['stealer_name']}* stole *{int(entry['amount']):,}* of our members!"
+                )
 
     await message.answer("\n".join(lines), parse_mode="Markdown")

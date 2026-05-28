@@ -31,6 +31,7 @@ STATIONS: list[str] = [
     "Welcome Team / Ushers",
     "Children Ministry",
     "Finance",
+    "Church Upgrade",
 ]
 
 # Reward multipliers per level (index 0 = Level 1, etc.)
@@ -81,6 +82,11 @@ HINTS: dict[str, list[str]] = {
         "Same pieces, different problem. Think harder.",
         "This is the final test. There is no mercy.",
     ],
+    "Church Upgrade": [
+        "A stronger foundation. Space for more souls.",
+        "Enlarging our tents. The harvest is plentiful.",
+        "A glorious sanctuary. Built to last generations.",
+    ],
 }
 
 # ---------------------------------------------------------------------------
@@ -127,6 +133,8 @@ PREREQS: list[tuple[str, int, str, int]] = [
     ("Children Ministry",   3, "Children Ministry",   2),
     ("Finance",             2, "Finance",             1),
     ("Finance",             3, "Finance",             2),
+    ("Church Upgrade",      2, "Church Upgrade",      1),
+    ("Church Upgrade",      3, "Church Upgrade",      2),
 
     # ── Worship Team: needs previous-level Sound Crew + Powerpoint ────────
     # L1 has no external prereq (needs "L0" which doesn't exist)
@@ -251,7 +259,7 @@ async def seed(db: AsyncSession) -> None:
 
     print()
     print("─" * 50)
-    print(f"✅  Stations : {len(STATIONS)} (8 stations × 3 levels = {len(STATIONS)*3} levels)")
+    print(f"✅  Stations : {len(STATIONS)} ({len(STATIONS)} stations × 3 levels = {len(STATIONS)*3} levels)")
     print(f"✅  Prereqs  : {prereqs_added} added, {prereqs_skipped} already existed")
     print(f"✅  Groups   : {groups_added} added ({len(GROUPS)} total)")
     print("─" * 50)
