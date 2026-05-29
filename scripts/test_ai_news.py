@@ -19,7 +19,7 @@ load_dotenv()
 from app.config import settings
 from app.database import init_db, AsyncSessionLocal
 from app.models import Group
-from app.services.ai_news import generate_gemini_news
+from app.services.ai_news import generate_gemini_news, build_news_prompt
 from sqlalchemy import select
 
 
@@ -59,31 +59,9 @@ async def test_event_driven_news_flow():
         "new_population": 52.0
     }
     
-    event_desc = (
-        f"Group '{mock_details['group_name']}' successfully completed standard upgrade "
-        f"'{mock_details['station_name']}' Level {mock_details['level_number']}! "
-        f"Their population increased: {int(mock_details['old_population'])} -> {int(mock_details['new_population'])}."
-    )
-
     # 3. Build the prompt
     print("\n✍️ Constructing Gemini Prompt...")
-    prompt = (
-        "You are 'The MYLC TIMES', a witty, dramatic, and humorous AI news anchor reporting on "
-        "a competitive church-building game. Your tone is like a lively parish radio announcer mixed with "
-        "a dramatic sports caster. You love church-themed puns, gentle teasing of lagging groups, and epic "
-        "descriptions of achievements such as crossing milestones of 100, 1000, 10000 people or being the first or (even last to do so).\n\n"
-        "Generate a highly entertaining, creative, and dynamic broadcast summary of the event that just occurred and its leaderboard impact.\n\n"
-        "Rules:\n"
-        "1. Write exactly 2 to 4 sentences.\n"
-        "2. Keep the total word count under 100 words.\n"
-        "3. Focus heavily on the action that just happened and how it affects the standings.\n"
-        "4. Format the message clearly with a starting radio emoji using HTML tags for bolding (e.g. 📻 <b>THE MYLC TIMES</b>).\n"
-        "5. Do not include markdown code blocks or raw JSON; output plain text ready for Telegram with HTML bold (<b>...</b>) or italic (<i>...</i>) tags. Do NOT use markdown asterisks (**) for bolding.\n\n"
-        f"--- RECENT EVENT ---\n"
-        f"{event_desc}\n\n"
-        f"--- CURRENT LEADERBOARD STANDINGS ---\n"
-        f"{'\n'.join(standings)}\n"
-    )
+    prompt = build_news_prompt("upgrade", mock_details, standings)
 
     print("\n=== CONSTRUCTED PROMPT ===")
     print(prompt)

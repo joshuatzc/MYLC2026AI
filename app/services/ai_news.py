@@ -66,6 +66,68 @@ async def generate_gemini_news(prompt: str) -> str:
         return "📻 *Static...* (Broadcast system connection interrupted)."
 
 
+def build_news_prompt(event_type: str, details: dict, standings: list[str]) -> str:
+    """
+    Constructs the dynamic prompt detailing Singlish expectations, the event, and standings.
+    """
+    system_instructions = (
+        "You are 'The MYLC TIMES', a witty, cheeky, and high-energy AI news anchor reporting on "
+        "a competitive church-building game. Your tone is a natural, authentic blend of a dramatic sports commentator "
+        "and a cheeky news reporter. Keep it realistic, witty, and engaging, teasing slacking groups and celebrating leaders.\n\n"
+        "Generate a highly entertaining, creative broadcast summary of the event that just occurred and its leaderboard impact.\n\n"
+        "Writing Style & Tone Rules:\n"
+        "1. Open the event summary dynamically with a diverse set of gossip or rumor-starting phrases (e.g., 'Hearsay...', 'I just heard...', 'Listen up guys...', 'Apparently...', 'Word on the street is...'). Do NOT always start with the same word.\n"
+        "2. Make clever, safe, and humorous wordplay or puns based on the group's name, depending on their performance or leaderboard standing (e.g., if a group named 'United' is winning, write 'they truly are united!', but if they are losing, write 'are they really united?').\n"
+        "3. Do NOT use any em-dashes (—) or colons (:) in the entire output.\n"
+        "4. Use raw digits for all numbers, populations, and level numbers (e.g., write 'Level 2' instead of 'rank two' or 'two', and '52' instead of 'fifty two' or 'fifty-two'). Do NOT spell out numbers as words.\n"
+        "5. Drop a few expressive, relevant reaction emojis here and there naturally throughout the message to make the bulletin visually engaging for Telegram (prefer reaction/human emojis like strong biceps 💪, laughing/crying-laughing 😂/🤣, eyes 👀, shushing 🤫, shocked 😱, fire 🔥, or celebrating 🎉 instead of item emojis like hammers or churches, and do not oversaturate it).\n\n"
+        "Formatting Rules:\n"
+        "1. Write the message in exactly three sections separated by single blank lines (two newlines):\n"
+        "   - Section 1 (Title): Strictly output '📻 <b>THE MYLC TIMES</b>'\n"
+        "   - Section 2 (Actual Event): Summarize what just happened in a realistic, witty style with the dynamic opening.\n"
+        "   - Section 3 (Implications / Sarcastic Side News): Discuss the leaderboard standings, group progress, or playfully tease slacking groups (e.g., 'In other news...', 'Meanwhile...').\n"
+        "2. Do NOT use markdown asterisks (**) for bolding. Use HTML bold tags (<b>...</b>) for any bolding to ensure Telegram parses it correctly.\n"
+        "3. Keep the total message under 100 words."
+    )
+
+    event_desc = ""
+    if event_type == "upgrade":
+        event_desc = (
+            f"Group '{details['group_name']}' successfully completed standard upgrade "
+            f"'{details['station_name']}' Level {details['level_number']}! "
+            f"Their population increased: {int(details['old_population'])} -> {int(details['new_population'])}."
+        )
+    elif event_type == "church_upgrade":
+        steal_info = ""
+        if details.get("theft_applied"):
+            steal_info = f" They also successfully stole {int(details['stolen_amount'])} congregation members from Group '{details['target_name']}'!"
+        event_desc = (
+            f"Group '{details['group_name']}' completed a massive Church Upgrade to Level {details['level_number']} "
+            f"({details['tier_name']})! Their population capacity expands. Population: {int(details['old_population'])} -> {int(details['new_population'])}.{steal_info}"
+        )
+    elif event_type == "rename":
+        event_desc = (
+            f"Group '{details['old_name']}' has officially renamed their church to '{details['new_name']}'!"
+        )
+    elif event_type == "create_group":
+        event_desc = (
+            f"A brand new group named '{details['group_name']}' has officially entered the church-building race with an initial population of {int(details['population'])}!"
+        )
+    else:
+        event_desc = f"An administrative event occurred for Group '{details.get('group_name', 'Unknown')}': {details.get('description', 'Status updated')}."
+
+    standings_str = "\n".join(standings)
+
+    prompt = (
+        f"{system_instructions}\n\n"
+        f"--- RECENT EVENT ---\n"
+        f"{event_desc}\n\n"
+        f"--- CURRENT LEADERBOARD STANDINGS ---\n"
+        f"{standings_str}\n"
+    )
+    return prompt
+
+
 async def trigger_event_broadcast(event_type: str, details: dict) -> None:
     """
     Triggers an immediate, event-driven AI news broadcast based on a game or admin action.
@@ -88,52 +150,8 @@ async def trigger_event_broadcast(event_type: str, details: dict) -> None:
             for idx, g in enumerate(groups):
                 standings.append(f"{idx + 1}. {g.name} ({int(g.population)} members)")
 
-        # 2. Build the event description for Gemini
-        event_desc = ""
-        if event_type == "upgrade":
-            event_desc = (
-                f"Group '{details['group_name']}' successfully completed standard upgrade "
-                f"'{details['station_name']}' Level {details['level_number']}! "
-                f"Their population increased: {int(details['old_population'])} -> {int(details['new_population'])}."
-            )
-        elif event_type == "church_upgrade":
-            steal_info = ""
-            if details.get("theft_applied"):
-                steal_info = f" They also successfully stole {int(details['stolen_amount'])} congregation members from Group '{details['target_name']}'!"
-            event_desc = (
-                f"Group '{details['group_name']}' completed a massive Church Upgrade to Level {details['level_number']} "
-                f"({details['tier_name']})! Their population capacity expands. Population: {int(details['old_population'])} -> {int(details['new_population'])}.{steal_info}"
-            )
-        elif event_type == "rename":
-            event_desc = (
-                f"Group '{details['old_name']}' has officially renamed their church to '{details['new_name']}'!"
-            )
-        elif event_type == "create_group":
-            event_desc = (
-                f"A brand new group named '{details['group_name']}' has officially entered the church-building race with an initial population of {int(details['population'])}!"
-            )
-        else:
-            event_desc = f"An administrative event occurred for Group '{details.get('group_name', 'Unknown')}': {details.get('description', 'Status updated')}."
-
-        # 3. Build prompt
-        standings_str = "\n".join(standings)
-        prompt = (
-            "You are 'The MYLC TIMES', a witty, dramatic, and humorous AI news anchor reporting on "
-            "a competitive church-building game. Your tone is like a lively parish radio announcer mixed with "
-            "a dramatic sports caster. You love church-themed puns, gentle teasing of lagging groups, and epic "
-            "descriptions of achievements such as crossing milestones of 100, 1000, 10000 people or being the first or (even last to do so).\n\n"
-            "Generate a highly entertaining, creative, and dynamic broadcast summary of the event that just occurred and its leaderboard impact.\n\n"
-            "Rules:\n"
-            "1. Write exactly 2 to 4 sentences.\n"
-            "2. Keep the total word count under 100 words.\n"
-            "3. Focus heavily on the action that just happened and how it affects the standings.\n"
-            "4. Format the message clearly with a starting radio emoji using HTML tags for bolding (e.g. 📻 <b>THE MYLC TIMES</b>).\n"
-            "5. Do not include markdown code blocks or raw JSON; output plain text ready for Telegram with HTML bold (<b>...</b>) or italic (<i>...</i>) tags. Do NOT use markdown asterisks (**) for bolding.\n\n"
-            f"--- RECENT EVENT ---\n"
-            f"{event_desc}\n\n"
-            f"--- CURRENT LEADERBOARD STANDINGS ---\n"
-            f"{standings_str}\n"
-        )
+        # 2. Build prompt
+        prompt = build_news_prompt(event_type, details, standings)
 
         # 4. Generate AI summary
         news_text = await generate_gemini_news(prompt)
