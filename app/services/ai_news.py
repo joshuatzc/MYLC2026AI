@@ -116,6 +116,7 @@ async def trigger_event_broadcast(event_type: str, details: dict) -> None:
             event_desc = f"An administrative event occurred for Group '{details.get('group_name', 'Unknown')}': {details.get('description', 'Status updated')}."
 
         # 3. Build prompt
+        standings_str = "\n".join(standings)
         prompt = (
             "You are 'The MYLC TIMES', a witty, dramatic, and humorous AI news anchor reporting on "
             "a competitive church-building game. Your tone is like a lively parish radio announcer mixed with "
@@ -131,7 +132,7 @@ async def trigger_event_broadcast(event_type: str, details: dict) -> None:
             f"--- RECENT EVENT ---\n"
             f"{event_desc}\n\n"
             f"--- CURRENT LEADERBOARD STANDINGS ---\n"
-            f"{'\n'.join(standings)}\n"
+            f"{standings_str}\n"
         )
 
         # 4. Generate AI summary
