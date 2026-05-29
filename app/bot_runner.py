@@ -45,10 +45,5 @@ async def start_polling() -> None:
     bot = create_bot()
     dp = create_dispatcher()
 
-    # Launch AI News periodic broadcast in the background
-    import asyncio
-    from app.services.ai_news import run_periodic_news_broadcast
-    asyncio.create_task(run_periodic_news_broadcast(bot))
-
     await dp.start_polling(bot, allowed_updates=["message", "callback_query"])
 

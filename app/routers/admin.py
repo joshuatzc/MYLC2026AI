@@ -122,7 +122,17 @@ async def create_group(
     group = Group(name=body.name, population=body.population)
     db.add(group)
     await db.commit()
+
+    # Trigger AI news
+    from app.services.ai_news import trigger_event_broadcast
+    import asyncio
+    asyncio.create_task(trigger_event_broadcast("create_group", {
+        "group_name": group.name,
+        "population": group.population,
+    }))
+
     return {"id": group.id, "name": group.name, "population": group.population}
+
 
 
 @router.get("/groups/{group_id}")
@@ -149,15 +159,41 @@ async def admin_upgrade(
     group_id: int, body: UpgradeRequest, db: AsyncSession = Depends(get_session)
 ) -> dict:
     try:
+        # Fetch group name before upgrade just in case
+        group_res = await db.execute(select(Group.name).where(Group.id == group_id))
+        group_name = group_res.scalar_one_or_none() or "Unknown Group"
+
         result = await game_logic.apply_level_upgrade(
             db,
             group_id,
             body.station_level_id,
             recorded_by=body.recorded_by or "admin",
         )
+
+        # Trigger AI news
+        from app.services.ai_news import trigger_event_broadcast
+        import asyncio
+        event_type = "church_upgrade" if result.get("church_upgraded") else "upgrade"
+        details = {
+            "group_name": group_name,
+            "station_name": result["station_name"],
+            "level_number": result["level_number"],
+            "old_population": result["old_population"],
+            "new_population": result["new_population"],
+        }
+        if event_type == "church_upgrade":
+            details.update({
+                "tier_name": result.get("tier_name"),
+                "theft_applied": result.get("theft_applied"),
+                "stolen_amount": result.get("stolen_amount"),
+                "target_name": result.get("target_name"),
+            })
+        asyncio.create_task(trigger_event_broadcast(event_type, details))
+
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     return result
+
 
 
 # ---------------------------------------------------------------------------

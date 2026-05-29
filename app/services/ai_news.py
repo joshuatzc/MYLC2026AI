@@ -1,22 +1,20 @@
 """
-services/ai_news.py – AI news generation and broadcasting service.
+services/ai_news.py – Event-driven AI news generation and broadcasting service.
 
-Queries recent game activities (upgrades and steals) and leaderboard standings,
-prompts the Google Gemini 3.1 Flash-Lite API for a creative church news broadcast,
-and broadcasts the resulting news to all active Telegram chat sessions.
+Triggered immediately upon upgrades, renames, steals, or group creations.
+Prompts Google Gemini 3.1 Flash-Lite to generate creative bulletins and
+broadcasts them directly to all active Telegram chat sessions in the background.
 """
 from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
 import aiohttp
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 
 from app.config import settings
 from app.database import AsyncSessionLocal
-from app.models import ChatState, Group, GroupStationProgress, StationLevel, Station, StealRecord
+from app.models import ChatState, Group
 
 logger = logging.getLogger(__name__)
 
@@ -68,155 +66,101 @@ async def generate_gemini_news(prompt: str) -> str:
         return "📻 *Static...* (Broadcast system connection interrupted)."
 
 
-async def get_recent_activity_and_standings(interval_minutes: int) -> tuple[list[str], list[str]]:
+async def trigger_event_broadcast(event_type: str, details: dict) -> None:
     """
-    Queries the database for:
-    1. Upgrades completed in the last `interval_minutes`.
-    2. Steals committed in the last `interval_minutes`.
-    3. The current leaderboard (population rank).
+    Triggers an immediate, event-driven AI news broadcast based on a game or admin action.
+    This is run as a non-blocking background task.
+    
+    Supported event types:
+      - 'upgrade': standard station upgrade
+      - 'church_upgrade': church tier upgrade
+      - 'rename': church/group renamed
+      - 'create_group': new group created
     """
-    cutoff = datetime.utcnow() - timedelta(minutes=interval_minutes)
-    activity = []
-    standings = []
+    logger.info("Triggered event-driven news broadcast for event type: %s", event_type)
 
-    async with AsyncSessionLocal() as session:
-        # 1. Fetch upgrades
-        progress_stmt = (
-            select(GroupStationProgress)
-            .where(GroupStationProgress.completed_at >= cutoff)
-            .options(
-                selectinload(GroupStationProgress.group),
-                selectinload(GroupStationProgress.station_level).selectinload(StationLevel.station)
+    try:
+        # 1. Fetch current standings
+        standings = []
+        async with AsyncSessionLocal() as session:
+            groups_stmt = select(Group).order_by(Group.population.desc())
+            groups = (await session.execute(groups_stmt)).scalars().all()
+            for idx, g in enumerate(groups):
+                standings.append(f"{idx + 1}. {g.name} ({int(g.population)} members)")
+
+        # 2. Build the event description for Gemini
+        event_desc = ""
+        if event_type == "upgrade":
+            event_desc = (
+                f"Group '{details['group_name']}' successfully completed standard upgrade "
+                f"'{details['station_name']}' Level {details['level_number']}! "
+                f"Their population increased: {int(details['old_population'])} -> {int(details['new_population'])}."
             )
-            .order_by(GroupStationProgress.completed_at.desc())
+        elif event_type == "church_upgrade":
+            steal_info = ""
+            if details.get("theft_applied"):
+                steal_info = f" They also successfully stole {int(details['stolen_amount'])} congregation members from Group '{details['target_name']}'!"
+            event_desc = (
+                f"Group '{details['group_name']}' completed a massive Church Upgrade to Level {details['level_number']} "
+                f"({details['tier_name']})! Their population capacity expands. Population: {int(details['old_population'])} -> {int(details['new_population'])}.{steal_info}"
+            )
+        elif event_type == "rename":
+            event_desc = (
+                f"Group '{details['old_name']}' has officially renamed their church to '{details['new_name']}'!"
+            )
+        elif event_type == "create_group":
+            event_desc = (
+                f"A brand new group named '{details['group_name']}' has officially entered the church-building race with an initial population of {int(details['population'])}!"
+            )
+        else:
+            event_desc = f"An administrative event occurred for Group '{details.get('group_name', 'Unknown')}': {details.get('description', 'Status updated')}."
+
+        # 3. Build prompt
+        prompt = (
+            "You are 'The MYLC TIMES', a witty, dramatic, and humorous AI news anchor reporting on "
+            "a competitive church-building game. Your tone is like a lively parish radio announcer mixed with "
+            "a dramatic sports caster. You love church-themed puns, gentle teasing of lagging groups, and epic "
+            "descriptions of achievements such as crossing milestones of 100, 1000, 10000 people or being the first or (even last to do so).\n\n"
+            "Generate a highly entertaining, creative, and dynamic broadcast summary of the event that just occurred and its leaderboard impact.\n\n"
+            "Rules:\n"
+            "1. Write exactly 2 to 4 sentences.\n"
+            "2. Keep the total word count under 100 words.\n"
+            "3. Focus heavily on the action that just happened and how it affects the standings.\n"
+            "4. Format the message clearly with a starting radio emoji using HTML tags for bolding (e.g. 📻 <b>THE MYLC TIMES</b>).\n"
+            "5. Do not include markdown code blocks or raw JSON; output plain text ready for Telegram with HTML bold (<b>...</b>) or italic (<i>...</i>) tags. Do NOT use markdown asterisks (**) for bolding.\n\n"
+            f"--- RECENT EVENT ---\n"
+            f"{event_desc}\n\n"
+            f"--- CURRENT LEADERBOARD STANDINGS ---\n"
+            f"{'\n'.join(standings)}\n"
         )
-        progress_records = (await session.execute(progress_stmt)).scalars().all()
 
-        for p in progress_records:
-            group_name = p.group.name if p.group else "Unknown Group"
-            station_name = p.station_level.station.name if p.station_level and p.station_level.station else "Unknown Station"
-            level_num = p.station_level.level_number if p.station_level else 0
-            pop_after = int(p.population_after)
-            activity.append(
-                f"- Group '{group_name}' successfully upgraded standard station '{station_name}' to Level {level_num} "
-                f"(new population: {pop_after})."
-            )
+        # 4. Generate AI summary
+        news_text = await generate_gemini_news(prompt)
 
-        # 2. Fetch steals
-        steal_stmt = (
-            select(StealRecord)
-            .where(StealRecord.created_at >= cutoff)
-            .options(
-                selectinload(StealRecord.stealer_group),
-                selectinload(StealRecord.target_group)
-            )
-            .order_by(StealRecord.created_at.desc())
-        )
-        steal_records = (await session.execute(steal_stmt)).scalars().all()
+        # 5. Broadcast to all active chat sessions
+        from aiogram import Bot
+        from aiogram.client.default import DefaultBotProperties
+        from aiogram.enums import ParseMode
 
-        for s in steal_records:
-            stealer = s.stealer_group.name if s.stealer_group else "Unknown Group"
-            target = s.target_group.name if s.target_group else "Unknown Group"
-            amount = int(s.amount)
-            activity.append(
-                f"- Group '{stealer}' completed a Church Upgrade and stole {amount} congregation members from Group '{target}'!"
-            )
-
-        # 3. Fetch standings
-        groups_stmt = select(Group).order_by(Group.population.desc())
-        groups = (await session.execute(groups_stmt)).scalars().all()
-        for idx, g in enumerate(groups):
-            standings.append(f"{idx + 1}. {g.name} ({int(g.population)} members)")
-
-    return activity, standings
-
-
-def build_news_prompt(activity: list[str], standings: list[str], interval_minutes: int) -> str:
-    """
-    Constructs the prompt detailing system expectations, game activities, and standings.
-    """
-    system_instructions = (
-        "You are 'The MYLC Chronicle', a witty, dramatic, and humorous AI news anchor reporting on "
-        "a competitive church-building game. Your tone is like a lively parish radio announcer mixed with "
-        "a dramatic sports caster. You love church-themed puns, gentle teasing of lagging groups, and epic "
-        "descriptions of achievements.\n\n"
-        "Generate a highly entertaining, creative, and dynamic broadcast summary of the last period. "
-        "Rules:\n"
-        "1. Write exactly 2 to 4 sentences.\n"
-        "2. Keep the total word count under 100 words.\n"
-        "3. Emphasize actual database activities (upgrades/steals) if they occurred.\n"
-        "4. If NO activity occurred, create a humorous piece of fictional church gossip (e.g., Pastor falling asleep, "
-        "cookies stolen from coffee hour, choir rehearsal drama) referencing the leading group or current standings.\n"
-        "5. Format the message clearly with a starting radio emoji (e.g. 📻 **THE MYLC CHRONICLE**).\n"
-        "6. Do not include markdown code blocks or raw JSON in your output; output plain text ready for Telegram with basic bold/italic tags."
-    )
-
-    if activity:
-        recent_log = "\n".join(activity)
-    else:
-        recent_log = f"No activity occurred in the last {interval_minutes} minutes."
-
-    leaderboard_log = "\n".join(standings)
-
-    prompt = (
-        f"{system_instructions}\n\n"
-        f"--- GAME DATA FOR THE LAST {interval_minutes} MINUTES ---\n"
-        f"Recent Activities:\n{recent_log}\n\n"
-        f"Current Leaderboard Standings:\n{leaderboard_log}\n"
-    )
-    return prompt
-
-
-async def run_periodic_news_broadcast(bot) -> None:
-    """
-    Background worker loop that triggers AI news updates periodically.
-    Runs indefinitely on FastAPI startup.
-    """
-    logger.info("AI news periodic broadcast worker started.")
-
-    while True:
+        bot = Bot(token=settings.TELEGRAM_BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
         try:
-            # Load interval dynamically in case it is changed / reloaded
-            interval_mins = settings.AI_NEWS_INTERVAL_MINUTES
-            interval_secs = interval_mins * 60
-
-            # Wait for the next interval
-            logger.info("AI news worker sleeping for %d seconds (%d minutes)...", interval_secs, interval_mins)
-            await asyncio.sleep(interval_secs)
-
-            logger.info("Executing scheduled AI news broadcast...")
-
-            # 1. Fetch data
-            activity, standings = await get_recent_activity_and_standings(interval_mins)
-
-            # 2. Build prompt
-            prompt = build_news_prompt(activity, standings, interval_mins)
-
-            # 3. Call Gemini
-            news_text = await generate_gemini_news(prompt)
-
-            # 4. Broadcast to all active chat sessions
             async with AsyncSessionLocal() as session:
                 chat_ids_stmt = select(ChatState.chat_id)
                 chat_ids = (await session.execute(chat_ids_stmt)).scalars().all()
 
             if not chat_ids:
                 logger.info("No active chat sessions found in database to broadcast to.")
-                continue
+                return
 
-            logger.info("Broadcasting news bulletin to %d chat sessions...", len(chat_ids))
+            logger.info("Broadcasting event-driven news to %d chat sessions...", len(chat_ids))
             for chat_id in chat_ids:
                 try:
                     await bot.send_message(chat_id=chat_id, text=news_text)
-                    # Tiny sleep to avoid hitting Telegram's rate limits
                     await asyncio.sleep(0.05)
                 except Exception as chat_exc:
                     logger.warning("Failed to send broadcast message to chat %s: %s", chat_id, chat_exc)
+        finally:
+            await bot.session.close()
 
-        except asyncio.CancelledError:
-            logger.info("AI news worker task was cancelled.")
-            break
-        except Exception as exc:
-            logger.exception("Unexpected error in periodic news worker loop: %s", exc)
-            # Sleep a bit before retrying to avoid spamming errors if DB or network goes down
-            await asyncio.sleep(30)
+    except Exception as exc:
+        logger.exception("Unexpected error in event broadcast task: %s", exc)

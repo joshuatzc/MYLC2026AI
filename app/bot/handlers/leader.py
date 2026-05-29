@@ -256,6 +256,12 @@ async def _process_rename_church(
         await auth.set_awaiting(db, chat_id, None)
         await db.commit()
 
+    # Trigger AI news
+    from app.services.ai_news import trigger_event_broadcast
+    import asyncio
+    asyncio.create_task(trigger_event_broadcast("rename", {"old_name": old_name, "new_name": new_name}))
+
+
     await message.answer(
         f"✅ *Church renamed successfully!*\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
@@ -488,6 +494,17 @@ async def cb_admin_confirm(callback: CallbackQuery) -> None:
                 await callback.answer(str(exc), show_alert=True)
                 return
 
+        # Trigger AI news
+        from app.services.ai_news import trigger_event_broadcast
+        import asyncio
+        asyncio.create_task(trigger_event_broadcast("upgrade", {
+            "group_name": group.name if group else "Unknown Group",
+            "station_name": result["station_name"],
+            "level_number": result["level_number"],
+            "old_population": result["old_population"],
+            "new_population": result["new_population"],
+        }))
+
         text = (
             f"✅ *Upgrade recorded!*\n\n"
             f"{result['station_name']} – Level {result['level_number']}\n"
@@ -523,6 +540,9 @@ async def cb_admin_church_confirm(callback: CallbackQuery) -> None:
             await callback.answer("No group selected.", show_alert=True)
             return
 
+        group = await _fetch_group(db, group_id)
+        group_name = group.name if group else "Unknown Group"
+
         try:
             result = await game_logic.apply_level_upgrade(
                 db, group_id, level_id, recorded_by=chat_id, steal_target_group_id=steal_target_id
@@ -530,6 +550,22 @@ async def cb_admin_church_confirm(callback: CallbackQuery) -> None:
         except ValueError as exc:
             await callback.answer(str(exc), show_alert=True)
             return
+
+    # Trigger AI news
+    from app.services.ai_news import trigger_event_broadcast
+    import asyncio
+    asyncio.create_task(trigger_event_broadcast("church_upgrade", {
+        "group_name": group_name,
+        "station_name": result["station_name"],
+        "level_number": result["level_number"],
+        "old_population": result["old_population"],
+        "new_population": result["new_population"],
+        "tier_name": result.get("tier_name"),
+        "theft_applied": result.get("theft_applied"),
+        "stolen_amount": result.get("stolen_amount"),
+        "target_name": result.get("target_name"),
+    }))
+
 
     if result["theft_applied"]:
         text = (

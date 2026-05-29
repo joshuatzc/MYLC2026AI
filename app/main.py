@@ -53,10 +53,6 @@ async def on_startup() -> None:
     asyncio.create_task(_polling())
     logger.info("Telegram bot polling started.")
 
-    # Launch AI News periodic broadcast in the background
-    from app.services.ai_news import run_periodic_news_broadcast
-    asyncio.create_task(run_periodic_news_broadcast(bot))
-    logger.info("AI news background broadcast worker started.")
 
 
 
