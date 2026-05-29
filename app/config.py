@@ -27,5 +27,11 @@ class Settings:
     # --- Game defaults ---
     STARTING_POPULATION: int = 10
 
+    # --- Gemini & AI News ---
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
+    AI_NEWS_INTERVAL_MINUTES: int = int(os.getenv("AI_NEWS_INTERVAL_MINUTES", "10"))
+
 
 settings = Settings()
+

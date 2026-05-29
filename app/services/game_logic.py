@@ -32,7 +32,7 @@ CHURCH_TIERS = {
     0: {"name": "Home Church", "max_occupancy": 30, "bonus": 0.0, "min_population": 0, "steal_amount": 0},
     1: {"name": "Family Church", "max_occupancy": 500, "bonus": 0.10, "min_population": 15, "steal_amount": 15},
     2: {"name": "Mega Church", "max_occupancy": 10000, "bonus": 0.20, "min_population": 300, "steal_amount": 150},
-    3: {"name": "Giga Church", "max_occupancy": 10000000, "bonus": 0.30, "min_population": 10000, "steal_amount": 2000},
+    3: {"name": "Giga Church", "max_occupancy": 10000000, "bonus": 0.30, "min_population": 3000, "steal_amount": 2000},
 }
 
 CHURCH_HINTS = {
@@ -48,7 +48,7 @@ CHURCH_HINTS = {
     },
     3: {
         1: "The ultimate expansion requires all standard stations to be completed to Level 3.",
-        2: "A Giga Church is a monumental city-wide sanctuary requiring at least 10,000 members.",
+        2: "A Giga Church is a monumental city-wide sanctuary requiring at least 3,000 members.",
         3: "Every standard ministry (Level 3) must be active to sustain a congregation of this scale."
     }
 }

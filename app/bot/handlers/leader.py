@@ -307,93 +307,117 @@ async def cb_admin_upgrade_detail(callback: CallbackQuery) -> None:
         group = await _fetch_group(db, group_id) if group_id else None
         level = await _fetch_level(db, level_id)
 
-    if group is None or level is None:
-        await callback.answer("Data not found.", show_alert=True)
-        return
+        if group is None or level is None:
+            await callback.answer("Data not found.", show_alert=True)
+            return
 
-    if level.station.name == "Church Upgrade":
-        new_level = level.level_number
-        min_pop = game_logic.get_church_min_pop(new_level)
-        steal_amt = game_logic.get_church_steal_amount(new_level)
-        new_max = game_logic.get_max_occupancy(new_level)
-        new_tier = game_logic.get_church_tier_name(new_level)
-        current_tier = game_logic.get_church_tier_name(group.church_level)
+        if level.station.name == "Church Upgrade":
+            new_level = level.level_number
+            min_pop = game_logic.get_church_min_pop(new_level)
+            steal_amt = game_logic.get_church_steal_amount(new_level)
+            new_max = game_logic.get_max_occupancy(new_level)
+            new_tier = game_logic.get_church_tier_name(new_level)
+            current_tier = game_logic.get_church_tier_name(group.church_level)
 
-        if group.population < min_pop:
-            text = (
-                f"🏛️ *Prerequisite Not Met!* 🏛️\n"
-                f"━━━━━━━━━━━━━━━━━━━\n"
-                f"Upgrade: *Church Upgrade – Level {new_level} ({new_tier})*\n\n"
-                f"❌ *Blocked:* To upgrade your church to a **{new_tier}**, your group must have at least **{min_pop}** congregation members.\n\n"
-                f"👥 Current Population: **{int(group.population):,}** members\n\n"
-                f"💡 *Hint:* Complete other standard station upgrades first to grow your congregation!"
-            )
-            await callback.message.edit_text(
-                text,
-                parse_mode="Markdown",
-                reply_markup=admin_eligible_keyboard([]),
-            )
-        else:
-            # Calculate rank-based next_boost
-            completions_count = await db.execute(
-                select(func.count(GroupStationProgress.id))
-                .where(GroupStationProgress.station_level_id == level_id)
-            )
-            N = completions_count.scalar() or 0
-            
-            next_boost = 15 - N
-            if N == 13:
-                next_boost = 1
-            elif next_boost < 1:
-                next_boost = 1
+            if group.population < min_pop:
+                text = (
+                    f"🏛️ *Prerequisite Not Met!* 🏛️\n"
+                    f"━━━━━━━━━━━━━━━━━━━\n"
+                    f"Upgrade: *Church Upgrade – Level {new_level} ({new_tier})*\n\n"
+                    f"❌ *Blocked:* To upgrade your church to a **{new_tier}**, your group must have at least **{min_pop}** congregation members.\n\n"
+                    f"👥 Current Population: **{int(group.population):,}** members\n\n"
+                    f"💡 *Hint:* Complete other standard station upgrades first to grow your congregation!"
+                )
+                await callback.message.edit_text(
+                    text,
+                    parse_mode="Markdown",
+                    reply_markup=admin_eligible_keyboard([]),
+                )
+            else:
+                # Calculate rank-based next_boost
+                completions_count = await db.execute(
+                    select(func.count(GroupStationProgress.id))
+                    .where(GroupStationProgress.station_level_id == level_id)
+                )
+                N = completions_count.scalar() or 0
                 
-            current_bonus_pct = round((await game_logic.get_group_church_bonus(db, group_id)) * 100)
+                next_boost = 15 - N
+                if N == 13:
+                    next_boost = 1
+                elif next_boost < 1:
+                    next_boost = 1
+                    
+                current_bonus_pct = round((await game_logic.get_group_church_bonus(db, group_id)) * 100)
 
-            # Get already purchased hints for this level
-            purchased = await game_logic.get_purchased_hint_numbers(db, group_id, level_id)
+                # Get already purchased hints for this level
+                purchased = await game_logic.get_purchased_hint_numbers(db, group_id, level_id)
+                
+                # Find next hint number sequentially (must buy 1, then 2, then 3)
+                next_hint_num = None
+                for h in (1, 2, 3):
+                    if h not in purchased:
+                        next_hint_num = h
+                        break
+                
+                cost_pct = 0
+                if next_hint_num is not None:
+                    base_percentage = 0.10 + (next_hint_num * 0.05)  # 15%, 20%, 25%
+                    cost_pct = round(max(0.01, base_percentage - (N * 0.01)) * 100)
+                
+                text = (
+                    f"🏛️ *Confirm Church Upgrade* 🏛️\n"
+                    f"━━━━━━━━━━━━━━━━━━━\n"
+                    f"Upgrade: *Church Upgrade – Level {new_level} ({new_tier})*\n\n"
+                    f"⚠️ *WARNING:* (CONFIRM Only if u passed the STATION)\n\n"
+                    f"👥 Current Population: **{int(group.population):,}** (Min required: {min_pop})\n"
+                    f"👥 New Max Occupancy: **{new_max:,}**\n"
+                    f"📈 Station Earning Bonus: **+{current_bonus_pct}%** (`+{next_boost}%` if upgraded now! 🏆)\n"
+                    f"⚡ *Special Perk:* Steal up to **{steal_amt}** members from any group at **{current_tier}**!\n\n"
+                    f"💡 Hint: _{level.hint_text}_\n\n"
+                    f"Are you sure you want to upgrade your church?"
+                )
+                await callback.message.edit_text(
+                    text,
+                    parse_mode="Markdown",
+                    reply_markup=church_confirm_keyboard(level_id, next_hint_num, cost_pct),
+                )
+        else:
+            # Calculate correct estimated population taking church passive bonus and max occupancy cap into account
+            earned = group.population * (level.reward_multiplier - 1.0)
+            bonus_pct = await game_logic.get_group_church_bonus(db, group_id)
+            total_earned = earned * (1.0 + bonus_pct)
+            new_pop = round(group.population + total_earned)
+
+            # Cap based on max occupancy of current church level
+            max_occ = game_logic.get_max_occupancy(group.church_level)
+            capped = new_pop > max_occ
+            new_pop = min(max_occ, new_pop)
+
+            bonus_pct_display = round(bonus_pct * 100)
+
+            # Detail the passive bonus earning boost
+            buffs_info = ""
+            if bonus_pct_display > 0:
+                buffs_info += f"📈 *Church Passive Bonus:* `+{bonus_pct_display}%` additional members earned\n"
             
-            # Find next hint number sequentially (must buy 1, then 2, then 3)
-            next_hint_num = None
-            for h in (1, 2, 3):
-                if h not in purchased:
-                    next_hint_num = h
-                    break
-            
-            cost_pct = 0
-            if next_hint_num is not None:
-                base_percentage = 0.10 + (next_hint_num * 0.05)  # 15%, 20%, 25%
-                cost_pct = round(max(0.01, base_percentage - (N * 0.01)) * 100)
-            
+            if capped:
+                buffs_info += f"⚠️ *WARNING:* Your population will be *capped* at your current church limit of **{max_occ:,}** members! Upgrade your church to expand your capacity.\n"
+
             text = (
-                f"🏛️ *Confirm Church Upgrade* 🏛️\n"
-                f"━━━━━━━━━━━━━━━━━━━\n"
-                f"Upgrade: *Church Upgrade – Level {new_level} ({new_tier})*\n\n"
-                f"⚠️ *WARNING:* (CONFIRM Only if u passed the STATION)\n\n"
-                f"👥 Current Population: **{int(group.population):,}** (Min required: {min_pop})\n"
-                f"👥 New Max Occupancy: **{new_max:,}**\n"
-                f"📈 Station Earning Bonus: **+{current_bonus_pct}%** (`+{next_boost}%` if upgraded now! 🏆)\n"
-                f"⚡ *Special Perk:* Steal up to **{steal_amt}** members from any group at **{current_tier}**!\n\n"
+                f"🏷 *{group.name}*\n"
+                f"Upgrade: *{level.station.name} – Level {level.level_number}*\n\n"
+                f"👥 Current population: *{int(group.population):,}*\n"
+                f"👥 New population after upgrade: *{new_pop:,}*\n"
+                f"{buffs_info}\n"
                 f"💡 Hint: _{level.hint_text}_\n\n"
-                f"Are you sure you want to upgrade your church?"
+                f"Are you sure you want to confirm this upgrade?"
             )
             await callback.message.edit_text(
                 text,
                 parse_mode="Markdown",
-                reply_markup=church_confirm_keyboard(level_id, next_hint_num, cost_pct),
+                reply_markup=admin_confirm_keyboard(level_id),
             )
-    else:
-        new_pop = round(group.population * level.reward_multiplier)
-        await callback.message.edit_text(
-            f"🏷 *{group.name}*\n"
-            f"Upgrade: *{level.station.name} – Level {level.level_number}*\n\n"
-            f"👥 Current population: *{int(group.population):,}*\n"
-            f"👥 New population after upgrade: *{new_pop:,}*\n\n"
-            f"💡 Hint: _{level.hint_text}_\n\n"
-            f"Are you sure you want to confirm this upgrade?",
-            parse_mode="Markdown",
-            reply_markup=admin_confirm_keyboard(level_id),
-        )
-    await callback.answer()
+        await callback.answer()
 
 
 # ---------------------------------------------------------------------------
