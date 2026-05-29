@@ -37,19 +37,46 @@ CHURCH_TIERS = {
 
 CHURCH_HINTS = {
     1: {
-        1: "Welcome Team & Children Ministry must reach Level 1 before this upgrade is allowed.",
-        2: "Your group population must be at least 15 members to host a Family Church.",
-        3: "Growth is a team effort. Strengthen your standard stations to expand your borders."
+        1: {
+            "text": "The puzzle can be solved from 4 of these 7 pieces.",
+            "photo": "l1_h1.png"
+        },
+        2: {
+            "text": "These are the only 4 pieces you need to solve the puzzle.",
+            "photo": "l1_h2.png"
+        },
+        3: {
+            "text": "Here is how one of the pieces fits into the puzzle.",
+            "photo": "l1_h3.png"
+        }
     },
     2: {
-        1: "All standard stations must be completed to Level 2 before you can upgrade to a Mega Church.",
-        2: "Ensure your Finance and Worship Team are fully upgraded to support thousands.",
-        3: "The harvest requires strong leaders. Growth is locked until your congregation reaches 300 members."
+        1: {
+            "text": "This shows how the first 2 pieces fit in the puzzle.",
+            "photo": "l2_h1.png"
+        },
+        2: {
+            "text": "This shows how the first 4 pieces fit in the puzzle.",
+            "photo": "l2_h2.png"
+        },
+        3: {
+            "text": "This shows how the first 5 pieces fit in the puzzle.",
+            "photo": "l2_h3.png"
+        }
     },
     3: {
-        1: "The ultimate expansion requires all standard stations to be completed to Level 3.",
-        2: "A Giga Church is a monumental city-wide sanctuary requiring at least 3,000 members.",
-        3: "Every standard ministry (Level 3) must be active to sustain a congregation of this scale."
+        1: {
+            "text": "This shows how the first piece fits in the puzzle.",
+            "photo": "l3_h1.png"
+        },
+        2: {
+            "text": "This shows how the first 4 pieces fit in the puzzle.",
+            "photo": "l3_h2.png"
+        },
+        3: {
+            "text": "This shows how the first 9 pieces fit in the puzzle.",
+            "photo": "l3_h3.png"
+        }
     }
 }
 
@@ -538,14 +565,17 @@ async def buy_church_hint(
 
     await db.commit()
 
-    # Get hint text
+    # Get hint text and photo
     level_num = level.level_number
-    hint_text = CHURCH_HINTS.get(level_num, {}).get(hint_number, "No hint available.")
+    hint_data = CHURCH_HINTS.get(level_num, {}).get(hint_number, {"text": "No hint available.", "photo": None})
+    hint_text = hint_data.get("text", "No hint available.")
+    hint_photo = hint_data.get("photo")
 
     return {
         "cost": cost,
         "new_population": new_population,
         "hint_text": hint_text,
+        "hint_photo": hint_photo,
     }
 
 

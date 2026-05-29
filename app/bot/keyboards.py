@@ -170,3 +170,31 @@ def church_confirm_keyboard(
     builder.button(text="❌ Cancel", callback_data="admin_section")
     builder.adjust(1)
     return builder.as_markup()
+
+
+def my_church_dashboard_keyboard(level_id: int) -> InlineKeyboardMarkup:
+    """Build the button to view unlocked hints for the next level upgrade."""
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text="🖼️ View Unlocked Hints",
+        callback_data=f"view_hints_nav:{level_id}:0",
+    )
+    return builder.as_markup()
+
+
+def hint_carousel_keyboard(level_id: int, current_idx: int, total_hints: int) -> InlineKeyboardMarkup:
+    """Build navigation keyboard for browsing purchased photo hints."""
+    builder = InlineKeyboardBuilder()
+    
+    if total_hints > 1:
+        prev_idx = (current_idx - 1) % total_hints
+        next_idx = (current_idx + 1) % total_hints
+        builder.button(text="◀️ Prev", callback_data=f"view_hints_nav:{level_id}:{prev_idx}")
+        builder.button(text="❌ Close", callback_data="hints_carousel_close")
+        builder.button(text="Next ▶️", callback_data=f"view_hints_nav:{level_id}:{next_idx}")
+        builder.adjust(3)
+    else:
+        builder.button(text="❌ Close", callback_data="hints_carousel_close")
+        builder.adjust(1)
+        
+    return builder.as_markup()

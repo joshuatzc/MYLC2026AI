@@ -4,13 +4,14 @@ bot/handlers/church.py – My Church dashboard handler.
 from __future__ import annotations
 
 from aiogram import F, Router
-from aiogram.types import Message
-
+from aiogram.types import Message, CallbackQuery
+from app.bot.keyboards import my_church_dashboard_keyboard, hint_carousel_keyboard
 from app.bot.utils import require_group
 from app.database import AsyncSessionLocal
 from app.models import Group
 from app.services import game_logic
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 router = Router()
 
@@ -69,6 +70,7 @@ async def handle_my_church(message: Message) -> None:
         )
         
         # Display purchased hints for this next level
+        reply_markup = None
         async with AsyncSessionLocal() as db:
             from app.models import StationLevel, Station
             levels_res = await db.execute(
@@ -83,10 +85,129 @@ async def handle_my_church(message: Message) -> None:
                 purchased = await game_logic.get_purchased_hint_numbers(db, group.id, next_level_obj.id)
                 if purchased:
                     lines.append(f"\n💡 *Unlocked hints for {next_tier_name}:*")
-                    for h_num in sorted(purchased):
-                        hint_text = game_logic.CHURCH_HINTS.get(next_level, {}).get(h_num, "No hint available.")
-                        lines.append(f"  • *Hint {h_num}:* {hint_text}")
+                    hint_numbers_str = ", ".join(f"Hint {h_num}" for h_num in sorted(purchased))
+                    lines.append(f"  • Unlocked: *{hint_numbers_str}*")
+                    lines.append("  • Tap the button below to view unlocked photo hints!")
+                    reply_markup = my_church_dashboard_keyboard(next_level_obj.id)
     else:
         lines.append(f"\n🎉 *Maximum Church Tier reached!* You have unlocked the legendary Giga Sanctuary.")
 
-    await message.answer("\n".join(lines), parse_mode="Markdown")
+    await message.answer("\n".join(lines), parse_mode="Markdown", reply_markup=reply_markup)
+
+
+# ---------------------------------------------------------------------------
+# Purchased Hints Interactive Photo Carousel Handlers
+# ---------------------------------------------------------------------------
+
+@router.callback_query(F.data.startswith("view_hints_nav:"))
+async def cb_view_hints_nav(callback: CallbackQuery) -> None:
+    parts = callback.data.split(":")
+    level_id = int(parts[1])
+    current_idx = int(parts[2])
+    chat_id = str(callback.message.chat.id)
+
+    async with AsyncSessionLocal() as db:
+        group_id = await require_group(callback.message, chat_id)
+        if group_id is None:
+            await callback.answer("No group selected.", show_alert=True)
+            return
+
+        from app.models import StationLevel
+        level_res = await db.execute(
+            select(StationLevel)
+            .options(selectinload(StationLevel.station))
+            .where(StationLevel.id == level_id)
+        )
+        level_obj = level_res.scalar_one_or_none()
+        if not level_obj:
+            await callback.answer("Level not found.", show_alert=True)
+            return
+
+        purchased = await game_logic.get_purchased_hint_numbers(db, group_id, level_id)
+        if not purchased:
+            await callback.answer("No hints purchased yet for this level.", show_alert=True)
+            return
+
+        # Sort hint numbers to maintain order (e.g. 1, 2, 3)
+        purchased = sorted(purchased)
+        total_hints = len(purchased)
+        
+        # Guard index bounds
+        if current_idx < 0 or current_idx >= total_hints:
+            current_idx = 0
+            
+        hint_number = purchased[current_idx]
+        level_num = level_obj.level_number
+
+        # Get hint info
+        hint_data = game_logic.CHURCH_HINTS.get(level_num, {}).get(hint_number, {"text": "No hint available.", "photo": None})
+        hint_text = hint_data.get("text", "No hint available.")
+        photo_filename = hint_data.get("photo")
+
+    # Resolve photo path
+    import os
+    photo_path = None
+    if photo_filename:
+        possible_paths = [
+            os.path.join("assets", "hints", photo_filename),
+            os.path.join("app", "assets", "hints", photo_filename),
+        ]
+        for path in possible_paths:
+            if os.path.exists(path):
+                photo_path = path
+                break
+
+    # Build navigation keyboard
+    keyboard = hint_carousel_keyboard(level_id, current_idx, total_hints)
+    caption = (
+        f"💡 *Hint {hint_number}* (of {total_hints} unlocked)\n"
+        f"━━━━━━━━━━━━━━━━━━━\n\n"
+        f"_{hint_text}_"
+    )
+
+    from aiogram.types import FSInputFile, InputMediaPhoto
+
+    # Check if the message is already a photo/carousel message
+    is_photo_message = callback.message.photo is not None
+
+    if photo_path:
+        photo_input = FSInputFile(photo_path)
+        if is_photo_message:
+            # Edit existing photo message in-place
+            try:
+                media = InputMediaPhoto(media=photo_input, caption=caption, parse_mode="Markdown")
+                await callback.message.edit_media(media=media, reply_markup=keyboard)
+                await callback.answer()
+            except Exception:
+                # Fallback: delete and send new
+                await callback.message.delete()
+                await callback.message.answer_photo(photo=photo_input, caption=caption, parse_mode="Markdown", reply_markup=keyboard)
+                await callback.answer()
+        else:
+            # First load from text dashboard: send new photo message
+            await callback.message.answer_photo(photo=photo_input, caption=caption, parse_mode="Markdown", reply_markup=keyboard)
+            await callback.answer()
+    else:
+        # Text-only hint
+        if is_photo_message:
+            # Delete photo message and send text
+            await callback.message.delete()
+            await callback.message.answer(caption, parse_mode="Markdown", reply_markup=keyboard)
+            await callback.answer()
+        else:
+            # Edit in place
+            try:
+                await callback.message.edit_text(caption, parse_mode="Markdown", reply_markup=keyboard)
+                await callback.answer()
+            except Exception:
+                await callback.message.answer(caption, parse_mode="Markdown", reply_markup=keyboard)
+                await callback.answer()
+
+
+@router.callback_query(F.data == "hints_carousel_close")
+async def cb_hints_carousel_close(callback: CallbackQuery) -> None:
+    try:
+        await callback.message.delete()
+    except Exception:
+        await callback.message.edit_text("Closed hint viewer.")
+    await callback.answer()

@@ -675,3 +675,32 @@ async def cb_admin_church_hint_buy(callback: CallbackQuery) -> None:
         parse_mode="Markdown",
         reply_markup=None,
     )
+
+    # Deliver the purchased hint immediately (with photo support if exists)
+    import os
+    from aiogram.types import FSInputFile
+
+    photo_filename = result.get("hint_photo")
+    photo_path = None
+    if photo_filename:
+        possible_paths = [
+            os.path.join("assets", "hints", photo_filename),
+            os.path.join("app", "assets", "hints", photo_filename),
+        ]
+        for path in possible_paths:
+            if os.path.exists(path):
+                photo_path = path
+                break
+
+    if photo_path:
+        photo = FSInputFile(photo_path)
+        await callback.message.answer_photo(
+            photo=photo,
+            caption=f"💡 *Hint {hint_number} unlocked!*\n\n{result['hint_text']}",
+            parse_mode="Markdown",
+        )
+    else:
+        await callback.message.answer(
+            f"💡 *Hint {hint_number} unlocked!*\n\n{result['hint_text']}",
+            parse_mode="Markdown",
+        )

@@ -66,14 +66,37 @@ async def generate_gemini_news(prompt: str) -> str:
         return "📻 *Static...* (Broadcast system connection interrupted)."
 
 
-def build_news_prompt(event_type: str, details: dict, standings: list[str], history_logs: list[str]) -> str:
+def build_news_prompt(event_type: str, details: dict, standings: list[str], history_logs: list[str], tone: str | None = None) -> str:
     """
     Constructs the dynamic prompt detailing expectations, the event, recent history, and standings.
     """
+    if not tone:
+        import random
+        tone = random.choice(["sarcastic", "encouraging", "hype"])
+
+    if tone == "encouraging":
+        tone_rule = (
+            "For Section 3 (Implications / Commentary), you MUST write in a highly encouraging, positive, warm, and supportive tone. "
+            "Celebrate the leading group's hard work, cheer on the lagging groups to keep fighting and building, and inspire a sense "
+            "of friendly fellowship, hope, and community growth. Avoid any sarcasm, mockery, or cynicism in this section."
+        )
+    elif tone == "hype":
+        tone_rule = (
+            "For Section 3 (Implications / Commentary), you MUST write in an epic, highly dramatic, and high-energy sports commentator tone. "
+            "Hype up the rising stakes, paint the leading group as a mighty giant, build up the suspense and leaderboard rivalry, and make "
+            "it feel like a grand, action-packed showdown. Avoid sarcastic roasting; focus on high-stakes competition."
+        )
+    else:
+        tone_rule = (
+            "For Section 3 (Implications / Commentary), you MUST write in a highly sarcastic, dryly witty, and cheeky tone. "
+            "Playfully roast the slacking groups who are stuck at their starting populations or napping in the back pews, comparing them "
+            "to statues and teasing them for falling behind."
+        )
+
     system_instructions = (
         "You are 'The MYLC TIMES', a witty, cheeky, and high-energy AI news anchor reporting on "
         "a competitive church-building game. Your tone is a natural, authentic blend of a dramatic sports commentator "
-        "and a cheeky news reporter. Keep it realistic, witty, and engaging, teasing slacking groups and celebrating leaders.\n\n"
+        "and a cheeky news reporter. Keep it realistic, witty, and engaging.\n\n"
         "Generate a highly entertaining, creative broadcast summary of the event that just occurred and its leaderboard impact.\n\n"
         "Writing Style & Tone Rules:\n"
         "1. Open the event summary dynamically with a diverse set of gossip or rumor-starting phrases (e.g., 'Hearsay...', 'I just heard...', 'Listen up guys...', 'Apparently...', 'Word on the street is...'). Do NOT always start with the same word.\n"
@@ -82,12 +105,13 @@ def build_news_prompt(event_type: str, details: dict, standings: list[str], hist
         "4. Do NOT use any em-dashes (—) or colons (:) in the entire output.\n"
         "5. Use raw digits for all numbers, populations, and level numbers (e.g., write 'Level 2' instead of 'rank two' or 'two', and '52' instead of 'fifty two' or 'fifty-two'). Do NOT spell out numbers as words.\n"
         "6. Whenever referring to any specific group names in the event or standings, always bold them using HTML tags (e.g., write '<b>Group 1</b>' or '<b>good church</b>').\n"
-        "7. Drop a few expressive, relevant reaction emojis here and there naturally throughout the message to make the bulletin visually engaging for Telegram (prefer reaction/human emojis like strong biceps 💪, laughing/crying-laughing 😂/🤣, eyes 👀, shushing 🤫, shocked 😱, fire 🔥, or celebrating 🎉 instead of item emojis like hammers or churches, and do not oversaturate it).\n\n"
+        "7. Drop a few expressive, relevant reaction emojis here and there naturally throughout the message to make the bulletin visually engaging for Telegram (prefer reaction/human emojis like strong biceps 💪, laughing/crying-laughing 😂/🤣, eyes 👀, shushing 🤫, shocked 😱, fire 🔥, or celebrating 🎉 instead of item emojis like hammers or churches, and do not oversaturate it).\n"
+        f"8. MANDATORY IMPLICATIONS TONE RULE: {tone_rule}\n\n"
         "Formatting Rules:\n"
         "1. Write the message in exactly three sections separated by single blank lines (two newlines):\n"
         "   - Section 1 (Title): Strictly output '📻 <b>THE MYLC TIMES</b>'\n"
         "   - Section 2 (Actual Event): Summarize what just happened in a realistic, witty style with the dynamic opening.\n"
-        "   - Section 3 (Implications / Commentary): Discuss the leaderboard standings, group progress, or other groups' reactions. Dynamically vary the tone of this section: sometimes make it highly sarcastic, playful, or teasing towards lagging groups, and other times make it encouraging, warm, or inspiring to cheer on other groups or celebrate general progress (e.g., 'In other news...', 'Meanwhile...', 'Let's see if the rest...').\n"
+        "   - Section 3 (Implications / Commentary): Discuss the leaderboard standings, group progress, or other groups' reactions based on the MANDATORY IMPLICATIONS TONE RULE.\n"
         "2. Do NOT use markdown asterisks (**) for bolding. Use HTML bold tags (<b>...</b>) for any bolding to ensure Telegram parses it correctly.\n"
         "3. Keep the total message under 100 words."
     )
@@ -198,7 +222,9 @@ async def trigger_event_broadcast(event_type: str, details: dict) -> None:
             history_logs = [f"- {item['desc']}" for item in recent_history]
 
         # 2. Build prompt
-        prompt = build_news_prompt(event_type, details, standings, history_logs)
+        import random
+        selected_tone = random.choice(["sarcastic", "encouraging", "hype"])
+        prompt = build_news_prompt(event_type, details, standings, history_logs, tone=selected_tone)
 
         # 4. Generate AI summary
         news_text = await generate_gemini_news(prompt)

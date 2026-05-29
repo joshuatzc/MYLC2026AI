@@ -116,15 +116,7 @@ async def test_event_driven_news_flow():
         "new_population": 52.0
     }
     
-    # 3. Build the prompt
-    print("\n✍️ Constructing Gemini Prompt...")
-    prompt = build_news_prompt("upgrade", mock_details, standings, history_logs)
-
-    print("\n=== CONSTRUCTED PROMPT ===")
-    print(prompt)
-    print("==========================")
-
-    # 4. Call Gemini API
+    # 3. Call Gemini API for each tone
     api_key = settings.GEMINI_API_KEY
     if not api_key:
         print("\n⚠️ WARNING: GEMINI_API_KEY environment variable is empty or not set in your .env file.")
@@ -132,11 +124,16 @@ async def test_event_driven_news_flow():
         print("GEMINI_API_KEY=your_key_here")
         print("\nSkipping live API call. Offline prompt verification looks perfect!")
     else:
-        print("\n🚀 Executing live call to Google Gemini API (model: {})...".format(settings.GEMINI_MODEL))
-        response = await generate_gemini_news(prompt)
-        print("\n=== LIVE EVENT-DRIVEN AI NEWS BULLETIN ===")
-        print(response)
-        print("==========================================")
+        for tone in ["sarcastic", "encouraging", "hype"]:
+            print(f"\n✍️ Constructing Gemini Prompt for tone '{tone}'...")
+            prompt = build_news_prompt("upgrade", mock_details, standings, history_logs, tone=tone)
+
+            print(f"\n🚀 Executing live call to Google Gemini API (model: {settings.GEMINI_MODEL}) for tone '{tone}'...")
+            response = await generate_gemini_news(prompt)
+            print(f"\n=== LIVE EVENT-DRIVEN AI NEWS BULLETIN (TONE: {tone.upper()}) ===")
+            print(response)
+            print("================================================================")
+            await asyncio.sleep(1)  # small pause between API calls
 
 
 if __name__ == "__main__":
