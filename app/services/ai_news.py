@@ -66,9 +66,9 @@ async def generate_gemini_news(prompt: str) -> str:
         return "📻 *Static...* (Broadcast system connection interrupted)."
 
 
-def build_news_prompt(event_type: str, details: dict, standings: list[str]) -> str:
+def build_news_prompt(event_type: str, details: dict, standings: list[str], history_logs: list[str]) -> str:
     """
-    Constructs the dynamic prompt detailing Singlish expectations, the event, and standings.
+    Constructs the dynamic prompt detailing expectations, the event, recent history, and standings.
     """
     system_instructions = (
         "You are 'The MYLC TIMES', a witty, cheeky, and high-energy AI news anchor reporting on "
@@ -78,14 +78,16 @@ def build_news_prompt(event_type: str, details: dict, standings: list[str]) -> s
         "Writing Style & Tone Rules:\n"
         "1. Open the event summary dynamically with a diverse set of gossip or rumor-starting phrases (e.g., 'Hearsay...', 'I just heard...', 'Listen up guys...', 'Apparently...', 'Word on the street is...'). Do NOT always start with the same word.\n"
         "2. Make clever, safe, and humorous wordplay or puns based on the group's name, depending on their performance or leaderboard standing (e.g., if a group named 'United' is winning, write 'they truly are united!', but if they are losing, write 'are they really united?').\n"
-        "3. Do NOT use any em-dashes (—) or colons (:) in the entire output.\n"
-        "4. Use raw digits for all numbers, populations, and level numbers (e.g., write 'Level 2' instead of 'rank two' or 'two', and '52' instead of 'fifty two' or 'fifty-two'). Do NOT spell out numbers as words.\n"
-        "5. Drop a few expressive, relevant reaction emojis here and there naturally throughout the message to make the bulletin visually engaging for Telegram (prefer reaction/human emojis like strong biceps 💪, laughing/crying-laughing 😂/🤣, eyes 👀, shushing 🤫, shocked 😱, fire 🔥, or celebrating 🎉 instead of item emojis like hammers or churches, and do not oversaturate it).\n\n"
+        "3. Look closely at the RECENT GAME HISTORY section to notice patterns, streaks, or repeating actions (e.g., a group doing multiple upgrades in a row, or stealing repeatedly from the same rival) and reference these rivalries or momentum hilariously in your commentary.\n"
+        "4. Do NOT use any em-dashes (—) or colons (:) in the entire output.\n"
+        "5. Use raw digits for all numbers, populations, and level numbers (e.g., write 'Level 2' instead of 'rank two' or 'two', and '52' instead of 'fifty two' or 'fifty-two'). Do NOT spell out numbers as words.\n"
+        "6. Whenever referring to any specific group names in the event or standings, always bold them using HTML tags (e.g., write '<b>Group 1</b>' or '<b>good church</b>').\n"
+        "7. Drop a few expressive, relevant reaction emojis here and there naturally throughout the message to make the bulletin visually engaging for Telegram (prefer reaction/human emojis like strong biceps 💪, laughing/crying-laughing 😂/🤣, eyes 👀, shushing 🤫, shocked 😱, fire 🔥, or celebrating 🎉 instead of item emojis like hammers or churches, and do not oversaturate it).\n\n"
         "Formatting Rules:\n"
         "1. Write the message in exactly three sections separated by single blank lines (two newlines):\n"
         "   - Section 1 (Title): Strictly output '📻 <b>THE MYLC TIMES</b>'\n"
         "   - Section 2 (Actual Event): Summarize what just happened in a realistic, witty style with the dynamic opening.\n"
-        "   - Section 3 (Implications / Sarcastic Side News): Discuss the leaderboard standings, group progress, or playfully tease slacking groups (e.g., 'In other news...', 'Meanwhile...').\n"
+        "   - Section 3 (Implications / Commentary): Discuss the leaderboard standings, group progress, or other groups' reactions. Dynamically vary the tone of this section: sometimes make it highly sarcastic, playful, or teasing towards lagging groups, and other times make it encouraging, warm, or inspiring to cheer on other groups or celebrate general progress (e.g., 'In other news...', 'Meanwhile...', 'Let's see if the rest...').\n"
         "2. Do NOT use markdown asterisks (**) for bolding. Use HTML bold tags (<b>...</b>) for any bolding to ensure Telegram parses it correctly.\n"
         "3. Keep the total message under 100 words."
     )
@@ -117,11 +119,14 @@ def build_news_prompt(event_type: str, details: dict, standings: list[str]) -> s
         event_desc = f"An administrative event occurred for Group '{details.get('group_name', 'Unknown')}': {details.get('description', 'Status updated')}."
 
     standings_str = "\n".join(standings)
+    history_str = "\n".join(history_logs) if history_logs else "No game history recorded yet."
 
     prompt = (
         f"{system_instructions}\n\n"
         f"--- RECENT EVENT ---\n"
         f"{event_desc}\n\n"
+        f"--- RECENT GAME HISTORY (OLDEST TO NEWEST) ---\n"
+        f"{history_str}\n\n"
         f"--- CURRENT LEADERBOARD STANDINGS ---\n"
         f"{standings_str}\n"
     )
@@ -132,26 +137,68 @@ async def trigger_event_broadcast(event_type: str, details: dict) -> None:
     """
     Triggers an immediate, event-driven AI news broadcast based on a game or admin action.
     This is run as a non-blocking background task.
-    
-    Supported event types:
-      - 'upgrade': standard station upgrade
-      - 'church_upgrade': church tier upgrade
-      - 'rename': church/group renamed
-      - 'create_group': new group created
     """
     logger.info("Triggered event-driven news broadcast for event type: %s", event_type)
 
     try:
-        # 1. Fetch current standings
+        # 1. Fetch current standings and recent history
         standings = []
+        history_logs = []
         async with AsyncSessionLocal() as session:
+            # Standings
             groups_stmt = select(Group).order_by(Group.population.desc())
             groups = (await session.execute(groups_stmt)).scalars().all()
             for idx, g in enumerate(groups):
                 standings.append(f"{idx + 1}. {g.name} ({int(g.population)} members)")
 
+            # Recent History: Last 5 standard completions
+            from app.models import GroupStationProgress, StealRecord, StationLevel, Station
+            from sqlalchemy.orm import selectinload
+
+            progress_stmt = (
+                select(GroupStationProgress)
+                .options(
+                    selectinload(GroupStationProgress.group),
+                    selectinload(GroupStationProgress.station_level).selectinload(StationLevel.station)
+                )
+                .order_by(GroupStationProgress.completed_at.desc())
+                .limit(5)
+            )
+            progress_records = (await session.execute(progress_stmt)).scalars().all()
+
+            # Recent History: Last 5 steals
+            steal_stmt = (
+                select(StealRecord)
+                .options(
+                    selectinload(StealRecord.stealer_group),
+                    selectinload(StealRecord.target_group)
+                )
+                .order_by(StealRecord.created_at.desc())
+                .limit(5)
+            )
+            steal_records = (await session.execute(steal_stmt)).scalars().all()
+
+            # Compile history events
+            history_events = []
+            for p in progress_records:
+                history_events.append({
+                    "time": p.completed_at,
+                    "desc": f"Group '{p.group.name if p.group else 'Unknown Group'}' upgraded '{p.station_level.station.name if p.station_level and p.station_level.station else 'Unknown Station'}' to Level {p.station_level.level_number if p.station_level else 0}."
+                })
+            for s in steal_records:
+                history_events.append({
+                    "time": s.created_at,
+                    "desc": f"Group '{s.stealer_group.name if s.stealer_group else 'Unknown Group'}' upgraded their Church and stole {int(s.amount)} members from Group '{s.target_group.name if s.target_group else 'Unknown Group'}'."
+                })
+
+            # Sort combined history chronologically (oldest to newest)
+            history_events.sort(key=lambda x: x["time"], reverse=True)
+            recent_history = history_events[:5]
+            recent_history.reverse()
+            history_logs = [f"- {item['desc']}" for item in recent_history]
+
         # 2. Build prompt
-        prompt = build_news_prompt(event_type, details, standings)
+        prompt = build_news_prompt(event_type, details, standings, history_logs)
 
         # 4. Generate AI summary
         news_text = await generate_gemini_news(prompt)

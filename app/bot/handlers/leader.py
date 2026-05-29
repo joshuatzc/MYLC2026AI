@@ -458,14 +458,49 @@ async def cb_admin_confirm(callback: CallbackQuery) -> None:
             targets = await game_logic.get_eligible_steal_targets_for_upgrade(db, group_id, group.church_level)
 
         if not targets:
+            # No eligible steal targets exist: bypass target selection and apply the upgrade immediately
+            async with AsyncSessionLocal() as db:
+                try:
+                    result = await game_logic.apply_level_upgrade(
+                        db, group_id, level_id, recorded_by=chat_id, steal_target_group_id=None
+                    )
+                except ValueError as exc:
+                    await callback.answer(str(exc), show_alert=True)
+                    return
+
+            # Trigger AI news event broadcast
+            from app.services.ai_news import trigger_event_broadcast
+            import asyncio
+            asyncio.create_task(trigger_event_broadcast("church_upgrade", {
+                "group_name": group.name if group else "Unknown Group",
+                "station_name": result["station_name"],
+                "level_number": result["level_number"],
+                "old_population": result["old_population"],
+                "new_population": result["new_population"],
+                "tier_name": result.get("tier_name"),
+                "theft_applied": False,
+                "stolen_amount": 0,
+                "target_name": None,
+            }))
+
             text = (
-                f"⚡ *Church Upgrade — No Theft Targets* ⚡\n"
+                f"🏛️ *Church Upgraded Successfully!* 🏛️\n"
                 f"━━━━━━━━━━━━━━━━━━━\n"
-                f"You are upgrading to a **{new_tier}**!\n"
-                f"This upgrade permits stealing up to **{steal_amt}** members from another **{current_tier}** group.\n\n"
-                f"⚠️ *Notice:* No other groups are currently at the **{current_tier}** tier! You will skip the theft and proceed with the upgrade only."
+                f"Your church has expanded to a *{result['tier_name']}* (Level {result['level_number']})!\n"
+                f"👥 Max Occupancy: **{result['max_occupancy']:,}**\n"
+                f"📈 Station Bonus: **+{result['bonus_pct']}%**\n\n"
+                f"*(No theft applied — no groups currently at your tier)*\n\n"
+                f"👥 Your Population: *{result['old_population']:,.0f}* → *{result['new_population']:,.0f}* 🎉"
             )
-            kb = church_steal_targets_keyboard(level_id, [])
+            if result.get("capped"):
+                text += "\n\n⚠️ *WARNING:* Population capped at max occupancy!"
+
+            await callback.message.edit_text(
+                text,
+                parse_mode="Markdown",
+                reply_markup=None,
+            )
+            await callback.answer("Church upgraded successfully!")
         else:
             text = (
                 f"⚡ *Church Upgrade — Select Theft Target* ⚡\n"
@@ -477,12 +512,12 @@ async def cb_admin_confirm(callback: CallbackQuery) -> None:
             )
             kb = church_steal_targets_keyboard(level_id, targets)
 
-        await callback.message.edit_text(
-            text,
-            parse_mode="Markdown",
-            reply_markup=kb,
-        )
-        await callback.answer()
+            await callback.message.edit_text(
+                text,
+                parse_mode="Markdown",
+                reply_markup=kb,
+            )
+            await callback.answer()
     else:
         # Standard station upgrade applied immediately
         async with AsyncSessionLocal() as db:
