@@ -55,6 +55,7 @@ async def handle_my_church(message: Message) -> None:
         lines.append(f"⚠️ *ALERT:* Your church is near capacity! Upgrade soon to avoid hitting the cap.")
 
     # Next upgrade info
+    reply_markup = None
     next_level = group.church_level + 1
     if next_level <= 3:
         next_tier_name = game_logic.get_church_tier_name(next_level)
