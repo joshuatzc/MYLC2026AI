@@ -265,6 +265,8 @@ async def seed(db: AsyncSession) -> None:
         ("super_pastor_claimed_by", None, None),
         ("infestation_active", False, None),
         ("corruption_active", False, None),
+        ("corruption_duration", None, None),
+        ("corruption_started_at", None, None),
     ]:
         res = await db.execute(select(GlobalState).where(GlobalState.key == key))
         if not res.scalar_one_or_none():

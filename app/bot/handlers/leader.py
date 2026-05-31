@@ -93,6 +93,8 @@ async def handle_admin_section(message: Message) -> None:
 @router.callback_query(F.data == "admin_section")
 async def cb_admin_section(callback: CallbackQuery) -> None:
     chat_id = str(callback.message.chat.id)
+    from app.bot.handlers.corruption import cancel_briefing_timer
+    cancel_briefing_timer(chat_id)
     async with AsyncSessionLocal() as db:
         await auth.set_awaiting(db, chat_id, None)
     await _show_admin_eligible(callback.message, chat_id, edit=True)
@@ -102,6 +104,8 @@ async def cb_admin_section(callback: CallbackQuery) -> None:
 @router.callback_query(F.data == "admin_cancel")
 async def cb_admin_cancel(callback: CallbackQuery) -> None:
     chat_id = str(callback.message.chat.id)
+    from app.bot.handlers.corruption import cancel_briefing_timer
+    cancel_briefing_timer(chat_id)
     async with AsyncSessionLocal() as db:
         await auth.set_awaiting(db, chat_id, None)
     await callback.message.edit_text("Action cancelled.")

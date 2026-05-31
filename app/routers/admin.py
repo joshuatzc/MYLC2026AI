@@ -507,6 +507,15 @@ async def start_corruption_event(
     else:
         dur_row.value_int = body.duration_minutes
 
+    # Store started at time
+    from datetime import datetime
+    started_res = await db.execute(select(GlobalState).where(GlobalState.key == "corruption_started_at"))
+    started_row = started_res.scalar_one_or_none()
+    if not started_row:
+        db.add(GlobalState(key="corruption_started_at", value_str=datetime.utcnow().isoformat()))
+    else:
+        started_row.value_str = datetime.utcnow().isoformat()
+
     # Clear all existing quiz states for a fresh round
     existing_states = (await db.execute(select(GroupQuizState))).scalars().all()
     for s in existing_states:
