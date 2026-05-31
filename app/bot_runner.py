@@ -10,7 +10,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
-from app.bot.handlers import common, journey, leader, prerequisites, church
+from app.bot.handlers import common, journey, leader, prerequisites, church, corruption
 from app.config import settings
 
 
@@ -32,6 +32,7 @@ def create_dispatcher() -> Dispatcher:
     dp.include_router(journey.router)
     dp.include_router(prerequisites.router)
     dp.include_router(leader.router)
+    dp.include_router(corruption.router)
 
     return dp
 

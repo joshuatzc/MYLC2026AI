@@ -102,12 +102,26 @@ def locked_detail_keyboard() -> InlineKeyboardMarkup:
 # Inline keyboards – Admin Section
 # ---------------------------------------------------------------------------
 
-def admin_eligible_keyboard(eligible: list[dict]) -> InlineKeyboardMarkup:
+def admin_eligible_keyboard(
+    eligible: list[dict],
+    super_pastor_active: bool = False,
+    corruption_quiz_available: bool = False,
+) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(
         text="✏️ Rename Church",
         callback_data="admin_rename_church_start",
     )
+    if super_pastor_active:
+        builder.button(
+            text="🌟 Claim Super Pastor",
+            callback_data="claim_super_pastor",
+        )
+    if corruption_quiz_available:
+        builder.button(
+            text="📜 Take Corruption Quiz",
+            callback_data="corruption_start_quiz",
+        )
     for lv in eligible:
         builder.button(
             text=f"{lv['station_name']} – Level {lv['level_number']}",
@@ -117,6 +131,7 @@ def admin_eligible_keyboard(eligible: list[dict]) -> InlineKeyboardMarkup:
     builder.button(text="❌ Cancel", callback_data="admin_cancel")
     builder.adjust(1)
     return builder.as_markup()
+
 
 
 def admin_confirm_keyboard(level_id: int) -> InlineKeyboardMarkup:

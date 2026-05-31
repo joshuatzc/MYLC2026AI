@@ -255,6 +255,22 @@ async def seed(db: AsyncSession) -> None:
         db.add(Group(name=gname, population=settings.STARTING_POPULATION))
         groups_added += 1
 
+    # ------------------------------------------------------------------
+    # Global state settings
+    # ------------------------------------------------------------------
+    from app.models import GlobalState
+    for key, val_bool, val_int in [
+        ("super_pastor_active", False, None),
+        ("super_pastor_reward", None, 1000),
+        ("super_pastor_claimed_by", None, None),
+        ("infestation_active", False, None),
+        ("corruption_active", False, None),
+    ]:
+        res = await db.execute(select(GlobalState).where(GlobalState.key == key))
+        if not res.scalar_one_or_none():
+            db.add(GlobalState(key=key, value_bool=val_bool, value_int=val_int))
+
+
     await db.commit()
 
     print()

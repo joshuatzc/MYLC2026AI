@@ -13,6 +13,7 @@ Endpoints:
 """
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime
 from typing import Any
 
@@ -23,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.config import settings
-from app.database import get_session
+from app.database import get_session, AsyncSessionLocal
 from app.models import Group, Station, StationLevel
 from app.services import game_logic
 
@@ -262,3 +263,316 @@ async def add_level(
         "station_id": station_id,
         "level_number": level.level_number,
     }
+
+
+# ---------------------------------------------------------------------------
+# Super Pastor Timed Event Control
+# ---------------------------------------------------------------------------
+
+class EventStartRequest(BaseModel):
+    reward_amount: int = 1000
+
+
+@router.post("/events/super-pastor/start")
+async def start_super_pastor_event(
+    body: EventStartRequest,
+    db: AsyncSession = Depends(get_session),
+    _: None = Depends(_require_admin_key),
+) -> dict:
+    """Start the Super Pastor event and broadcast it via THE MYLC TIMES."""
+    from app.models import GlobalState
+    
+    # Check if active
+    sp_active_res = await db.execute(select(GlobalState).where(GlobalState.key == "super_pastor_active"))
+    sp_active_row = sp_active_res.scalar_one_or_none()
+    
+    if not sp_active_row:
+        sp_active_row = GlobalState(key="super_pastor_active", value_bool=True)
+        db.add(sp_active_row)
+    else:
+        if sp_active_row.value_bool:
+            return {"status": "error", "message": "Super Pastor event is already active."}
+        sp_active_row.value_bool = True
+
+    # Set reward
+    sp_reward_res = await db.execute(select(GlobalState).where(GlobalState.key == "super_pastor_reward"))
+    sp_reward_row = sp_reward_res.scalar_one_or_none()
+    if not sp_reward_row:
+        sp_reward_row = GlobalState(key="super_pastor_reward", value_int=body.reward_amount)
+        db.add(sp_reward_row)
+    else:
+        sp_reward_row.value_int = body.reward_amount
+
+    # Reset claimed_by
+    claimed_by_res = await db.execute(select(GlobalState).where(GlobalState.key == "super_pastor_claimed_by"))
+    claimed_by_row = claimed_by_res.scalar_one_or_none()
+    if not claimed_by_row:
+        claimed_by_row = GlobalState(key="super_pastor_claimed_by", value_int=None)
+        db.add(claimed_by_row)
+    else:
+        claimed_by_row.value_int = None
+
+    await db.commit()
+
+    # Trigger AI announcement broadcast + auto-expire timer
+    from app.services.ai_news import trigger_event_broadcast
+    from app.services.timed_events import super_pastor_expire_timer
+    asyncio.create_task(trigger_event_broadcast("super_pastor_start", {
+        "reward_amount": body.reward_amount
+    }))
+    asyncio.create_task(super_pastor_expire_timer(20))
+
+    return {"status": "ok", "message": f"Super Pastor event started with reward {body.reward_amount}. Auto-expires in 20 minutes."}
+
+
+@router.post("/events/super-pastor/stop")
+async def stop_super_pastor_event(
+    db: AsyncSession = Depends(get_session),
+    _: None = Depends(_require_admin_key),
+) -> dict:
+    """Manually stop the Super Pastor event."""
+    from app.models import GlobalState
+    
+    sp_active_res = await db.execute(select(GlobalState).where(GlobalState.key == "super_pastor_active"))
+    sp_active_row = sp_active_res.scalar_one_or_none()
+    
+    if not sp_active_row or not sp_active_row.value_bool:
+        return {"status": "error", "message": "Super Pastor event is not currently active."}
+
+    sp_active_row.value_bool = False
+    await db.commit()
+
+    return {"status": "ok", "message": "Super Pastor event stopped."}
+
+
+@router.get("/events/super-pastor/status")
+async def super_pastor_event_status(
+    db: AsyncSession = Depends(get_session),
+    _: None = Depends(_require_admin_key),
+) -> dict:
+    """Check status of the Super Pastor event."""
+    from app.models import GlobalState
+    
+    sp_active_res = await db.execute(select(GlobalState).where(GlobalState.key == "super_pastor_active"))
+    sp_active_row = sp_active_res.scalar_one_or_none()
+    active = sp_active_row.value_bool if sp_active_row else False
+
+    sp_reward_res = await db.execute(select(GlobalState).where(GlobalState.key == "super_pastor_reward"))
+    sp_reward_row = sp_reward_res.scalar_one_or_none()
+    reward = sp_reward_row.value_int if sp_reward_row else 1000
+
+    claimed_by_res = await db.execute(select(GlobalState).where(GlobalState.key == "super_pastor_claimed_by"))
+    claimed_by_row = claimed_by_res.scalar_one_or_none()
+    claimed_by_id = claimed_by_row.value_int if claimed_by_row else None
+
+    claimed_by_name = None
+    if claimed_by_id:
+        group_res = await db.execute(select(Group.name).where(Group.id == claimed_by_id))
+        claimed_by_name = group_res.scalar_one_or_none()
+
+    return {
+        "active": active,
+        "reward_amount": reward,
+        "claimed_by_id": claimed_by_id,
+        "claimed_by_name": claimed_by_name
+    }
+
+
+# ---------------------------------------------------------------------------
+# Infestation Timed Event Control
+# ---------------------------------------------------------------------------
+
+class InfestationStartRequest(BaseModel):
+    cutoff: int
+    penalty: int = 300
+    duration_minutes: int = 20
+
+
+@router.post("/events/infestation/start")
+async def start_infestation_event(
+    body: InfestationStartRequest,
+    db: AsyncSession = Depends(get_session),
+    _: None = Depends(_require_admin_key),
+) -> dict:
+    """Start the Infestation timed audit event."""
+    from app.models import GlobalState
+
+    active_res = await db.execute(select(GlobalState).where(GlobalState.key == "infestation_active"))
+    active_row = active_res.scalar_one_or_none()
+
+    if active_row and active_row.value_bool:
+        return {"status": "error", "message": "Infestation event is already active."}
+
+    for key, val_bool, val_int, val_str in [
+        ("infestation_active",   True,         None,         None),
+        ("infestation_penalty",  None,         body.penalty, None),
+        ("infestation_cutoff",   None,         body.cutoff,  None),
+        ("infestation_duration", None,         body.duration_minutes, None),
+    ]:
+        row = (await db.execute(select(GlobalState).where(GlobalState.key == key))).scalar_one_or_none()
+        if not row:
+            row = GlobalState(key=key, value_bool=val_bool, value_int=val_int, value_str=val_str)
+            db.add(row)
+        else:
+            row.value_bool = val_bool
+            row.value_int = val_int
+            row.value_str = val_str
+
+    await db.commit()
+
+    from app.services.ai_news import trigger_event_broadcast
+    from app.services.timed_events import infestation_audit_timer
+    asyncio.create_task(trigger_event_broadcast("infestation_start", {"penalty": body.penalty, "cutoff": body.cutoff}))
+    asyncio.create_task(infestation_audit_timer(body.duration_minutes, body.cutoff, body.penalty))
+
+    return {
+        "status": "ok",
+        "message": (
+            f"Infestation event started. Cutoff score: {body.cutoff}. "
+            f"Penalty: {body.penalty}. Fires in {body.duration_minutes} minutes."
+        )
+    }
+
+
+@router.post("/events/infestation/stop")
+async def stop_infestation_event(
+    db: AsyncSession = Depends(get_session),
+    _: None = Depends(_require_admin_key),
+) -> dict:
+    """Manually cancel the Infestation event before the timer fires."""
+    from app.models import GlobalState
+    row = (await db.execute(select(GlobalState).where(GlobalState.key == "infestation_active"))).scalar_one_or_none()
+    if not row or not row.value_bool:
+        return {"status": "error", "message": "Infestation event is not currently active."}
+    row.value_bool = False
+    await db.commit()
+    return {"status": "ok", "message": "Infestation event cancelled."}
+
+
+@router.get("/events/infestation/status")
+async def infestation_event_status(
+    db: AsyncSession = Depends(get_session),
+    _: None = Depends(_require_admin_key),
+) -> dict:
+    """Check current status of the Infestation event."""
+    from app.models import GlobalState
+    keys = ["infestation_active", "infestation_cutoff", "infestation_penalty", "infestation_duration"]
+    rows = {
+        r.key: r for r in
+        (await db.execute(select(GlobalState).where(GlobalState.key.in_(keys)))).scalars().all()
+    }
+    return {
+        "active": rows.get("infestation_active") and rows["infestation_active"].value_bool,
+        "cutoff": rows.get("infestation_cutoff") and rows["infestation_cutoff"].value_int,
+        "penalty": rows.get("infestation_penalty") and rows["infestation_penalty"].value_int,
+        "duration_minutes": rows.get("infestation_duration") and rows["infestation_duration"].value_int,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Corruption of Leaders Quiz Event Control
+# ---------------------------------------------------------------------------
+
+class CorruptionStartRequest(BaseModel):
+    duration_minutes: int = 20
+
+
+@router.post("/events/corruption/start")
+async def start_corruption_event(
+    body: CorruptionStartRequest,
+    db: AsyncSession = Depends(get_session),
+    _: None = Depends(_require_admin_key),
+) -> dict:
+    """Start the Corruption of Leaders quiz event."""
+    from app.models import GlobalState, GroupQuizState
+
+    active_res = await db.execute(select(GlobalState).where(GlobalState.key == "corruption_active"))
+    active_row = active_res.scalar_one_or_none()
+
+    if active_row and active_row.value_bool:
+        return {"status": "error", "message": "Corruption event is already active."}
+
+    # Set active flag
+    if not active_row:
+        active_row = GlobalState(key="corruption_active", value_bool=True)
+        db.add(active_row)
+    else:
+        active_row.value_bool = True
+
+    # Store duration
+    dur_res = await db.execute(select(GlobalState).where(GlobalState.key == "corruption_duration"))
+    dur_row = dur_res.scalar_one_or_none()
+    if not dur_row:
+        db.add(GlobalState(key="corruption_duration", value_int=body.duration_minutes))
+    else:
+        dur_row.value_int = body.duration_minutes
+
+    # Clear all existing quiz states for a fresh round
+    existing_states = (await db.execute(select(GroupQuizState))).scalars().all()
+    for s in existing_states:
+        await db.delete(s)
+
+    await db.commit()
+
+    import json, os
+    quiz_path = os.path.join("app", "config", "corruption_quiz.json")
+    total_questions = 12
+    if os.path.exists(quiz_path):
+        with open(quiz_path) as f:
+            total_questions = len(json.load(f))
+
+    from app.services.ai_news import trigger_event_broadcast
+    from app.services.timed_events import corruption_expire_timer
+    asyncio.create_task(trigger_event_broadcast("corruption_start", {}))
+    asyncio.create_task(corruption_expire_timer(body.duration_minutes, total_questions))
+
+    return {
+        "status": "ok",
+        "message": f"Corruption of Leaders quiz started. {total_questions} questions. Auto-expires in {body.duration_minutes} minutes."
+    }
+
+
+@router.post("/events/corruption/stop")
+async def stop_corruption_event(
+    db: AsyncSession = Depends(get_session),
+    _: None = Depends(_require_admin_key),
+) -> dict:
+    """Manually cancel the Corruption event."""
+    from app.models import GlobalState
+    row = (await db.execute(select(GlobalState).where(GlobalState.key == "corruption_active"))).scalar_one_or_none()
+    if not row or not row.value_bool:
+        return {"status": "error", "message": "Corruption event is not currently active."}
+    row.value_bool = False
+    await db.commit()
+    return {"status": "ok", "message": "Corruption event cancelled."}
+
+
+@router.get("/events/corruption/status")
+async def corruption_event_status(
+    db: AsyncSession = Depends(get_session),
+    _: None = Depends(_require_admin_key),
+) -> dict:
+    """Check current status of the Corruption quiz event, including per-group progress."""
+    from app.models import GlobalState, GroupQuizState
+
+    active_res = await db.execute(select(GlobalState).where(GlobalState.key == "corruption_active"))
+    active_row = active_res.scalar_one_or_none()
+    active = active_row.value_bool if active_row else False
+
+    quiz_states = (await db.execute(
+        select(GroupQuizState).options()
+    )).scalars().all()
+
+    groups_progress = []
+    for qs in quiz_states:
+        group_res = await db.execute(select(Group.name).where(Group.id == qs.group_id))
+        gname = group_res.scalar_one_or_none() or f"Group {qs.group_id}"
+        groups_progress.append({
+            "group": gname,
+            "question": qs.current_question_index,
+            "correct": qs.correct_count,
+            "wrong": qs.wrong_count,
+            "completed": qs.completed,
+        })
+
+    return {"active": active, "groups_progress": groups_progress}

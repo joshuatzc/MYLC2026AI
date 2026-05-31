@@ -1,0 +1,62 @@
+[
+  {
+    "question": "Q1 (Easy) — When was the Methodist Church in Singapore founded?",
+    "options": { "A": "1876", "B": "1885", "C": "1895", "D": "1905" },
+    "answer": "B"
+  },
+  {
+    "question": "Q2 (Easy) — How many churches does the CAC currently have as a family?",
+    "options": { "A": "12 churches", "B": "15 churches", "C": "17 churches", "D": "20 churches" },
+    "answer": "C"
+  },
+  {
+    "question": "Q3 (Easy) — The CAC is one of how many Annual Conferences within The Methodist Church in Singapore?",
+    "options": { "A": "Two", "B": "Three", "C": "Four", "D": "Five" },
+    "answer": "B"
+  },
+  {
+    "question": "Q4 (Medium) — In what year did the Chinese Annual Conference emerge from the reconstitution of the Methodist Church in Malaysia and Singapore?",
+    "options": { "A": "1968", "B": "1972", "C": "1976", "D": "1980" },
+    "answer": "C"
+  },
+  {
+    "question": "Q5 (Medium) — Where was the first Chinese Methodist Church constructed?",
+    "options": { "A": "Waterloo Street", "B": "Telok Ayer Street", "C": "Middle Road", "D": "Barker Road" },
+    "answer": "B"
+  },
+  {
+    "question": "Q6 (Medium) — Who were the two founders that held the first Methodist Crusades in Singapore starting February 8th, 1885?",
+    "options": { "A": "Dr James Thoburn and William Oldham", "B": "Bishop Kao and Dr West", "C": "Bishop Thoburn and Oldham", "D": "William Oldham and Dr Benjamin West" },
+    "answer": "C"
+  },
+  {
+    "question": "Q7 (Hard) — When was the first Methodist Episcopal Church established in Singapore?",
+    "options": { "A": "8th February 1885", "B": "15th February 1885", "C": "22nd February 1885", "D": "1st March 1885" },
+    "answer": "C"
+  },
+  {
+    "question": "Q8 (Hard) — Who set up a dispensary in 1889 to catalyze entry into Chinese work?",
+    "options": { "A": "Rev William F Oldham", "B": "Dr Benjamin West", "C": "Bishop Kao Jih Chung", "D": "Dr James Thoburn" },
+    "answer": "B"
+  },
+  {
+    "question": "Q9 (Hard) — When was Ang Mo Kio Chinese Methodist Church instituted as a local conference?",
+    "options": { "A": "20th October 1982", "B": "24th October 1982", "C": "28th October 1982", "D": "1st November 1982" },
+    "answer": "B"
+  },
+  {
+    "question": "Q10 (Very Hard) — How many different dialects does the CAC conduct worship services and ministries in (not including Mandarin, English, Bahasa Indonesia, and Tamil)?",
+    "options": { "A": "Four", "B": "Five", "C": "Six", "D": "Seven" },
+    "answer": "C"
+  },
+  {
+    "question": "Q11 (Very Hard) — What year did Charis become an autonomous Church under the Chinese Annual Conference?",
+    "options": { "A": "1985", "B": "1987", "C": "1989", "D": "1991" },
+    "answer": "C"
+  },
+  {
+    "question": "Q12 (Very Hard) — In what year was Bukit Panjang Methodist Church first established?",
+    "options": { "A": "1935", "B": "1937", "C": "1939", "D": "1941" },
+    "answer": "B"
+  }
+]

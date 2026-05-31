@@ -269,8 +269,6 @@ async def _process_rename_church(
         f"New Name: *{new_name}*\n",
         parse_mode="Markdown",
     )
-    # Then show the admin upgrades list directly in a new message
-    await _show_admin_eligible(message, chat_id, edit=False)
 
 
 async def _show_admin_eligible(
@@ -284,19 +282,44 @@ async def _show_admin_eligible(
         group = await _fetch_group(db, group_id)
         eligible = await game_logic.get_eligible_levels(db, group_id)
 
+        # Check if Super Pastor is active
+        from app.models import GlobalState, GroupQuizState
+        sp_active_res = await db.execute(select(GlobalState).where(GlobalState.key == "super_pastor_active"))
+        sp_active_row = sp_active_res.scalar_one_or_none()
+        sp_active = sp_active_row.value_bool if sp_active_row else False
+
+        # Check if Corruption quiz is active and group hasn't completed it
+        corr_active_res = await db.execute(select(GlobalState).where(GlobalState.key == "corruption_active"))
+        corr_active_row = corr_active_res.scalar_one_or_none()
+        corruption_active = corr_active_row.value_bool if corr_active_row else False
+
+        corruption_quiz_available = False
+        if corruption_active:
+            quiz_state = (await db.execute(
+                select(GroupQuizState).where(GroupQuizState.group_id == group_id)
+            )).scalar_one_or_none()
+            corruption_quiz_available = not (quiz_state and quiz_state.completed)
+
     group_name = group.name if group else "?"
 
     if not eligible:
         text = f"Your group *{group_name}* has no eligible upgrades right now."
-        kb = admin_eligible_keyboard([])
+        if sp_active:
+            text = f"Your group *{group_name}* has no standard eligible upgrades right now, but a 🌟 *Super Pastor* is active!"
+        kb = admin_eligible_keyboard([], super_pastor_active=sp_active, corruption_quiz_available=corruption_quiz_available)
     else:
         text = f"⬆️ *Eligible upgrades for {group_name}:*"
-        kb = admin_eligible_keyboard(eligible)
+        if sp_active:
+            text = f"🌟 *SPECIAL EVENT ACTIVE: THE SUPER PASTOR HAS ARRIVED!* 🏃‍♂️💨\n\nBring the items to him IRL first to claim! Or proceed with standard upgrades below:\n\n{text}"
+        if corruption_quiz_available:
+            text = f"📜 *CORRUPTION INVESTIGATION ACTIVE!* Prove your legitimacy in the Admin Section above.\n\n{text}"
+        kb = admin_eligible_keyboard(eligible, super_pastor_active=sp_active, corruption_quiz_available=corruption_quiz_available)
 
     if edit:
         await message.edit_text(text, parse_mode="Markdown", reply_markup=kb)
     else:
         await message.answer(text, parse_mode="Markdown", reply_markup=kb)
+
 
 
 # ---------------------------------------------------------------------------
@@ -704,3 +727,90 @@ async def cb_admin_church_hint_buy(callback: CallbackQuery) -> None:
             f"💡 *Hint {hint_number} unlocked!*\n\n{result['hint_text']}",
             parse_mode="Markdown",
         )
+
+
+# ---------------------------------------------------------------------------
+# Claim Super Pastor Handler
+# ---------------------------------------------------------------------------
+
+@router.callback_query(F.data == "claim_super_pastor")
+async def cb_claim_super_pastor(callback: CallbackQuery) -> None:
+    chat_id = str(callback.message.chat.id)
+    
+    async with AsyncSessionLocal() as db:
+        group_id = await auth.get_current_group_id(db, chat_id)
+        if group_id is None:
+            await callback.answer("No group selected.", show_alert=True)
+            return
+
+        # Check if active (race condition safety)
+        from app.models import GlobalState, Group
+        sp_active_res = await db.execute(select(GlobalState).where(GlobalState.key == "super_pastor_active"))
+        sp_active_row = sp_active_res.scalar_one_or_none()
+        sp_active = sp_active_row.value_bool if sp_active_row else False
+
+        if not sp_active:
+            await callback.answer("⚠️ This event has already ended or is no longer active!", show_alert=True)
+            # Refresh admin eligible screen to remove button
+            await _show_admin_eligible(callback.message, chat_id, edit=True)
+            return
+
+        # Fetch reward
+        sp_reward_res = await db.execute(select(GlobalState).where(GlobalState.key == "super_pastor_reward"))
+        sp_reward_row = sp_reward_res.scalar_one_or_none()
+        reward_amount = sp_reward_row.value_int if sp_reward_row else 1000
+
+        # Claim: disable the event immediately
+        sp_active_row.value_bool = False
+        
+        # Set claimed_by
+        claimed_by_res = await db.execute(select(GlobalState).where(GlobalState.key == "super_pastor_claimed_by"))
+        claimed_by_row = claimed_by_res.scalar_one_or_none()
+        if not claimed_by_row:
+            claimed_by_row = GlobalState(key="super_pastor_claimed_by", value_int=group_id)
+            db.add(claimed_by_row)
+        else:
+            claimed_by_row.value_int = group_id
+        
+        # Give reward to group
+        group_res = await db.execute(select(Group).where(Group.id == group_id))
+        group = group_res.scalar_one_or_none()
+        if not group:
+            await callback.answer("Group not found.", show_alert=True)
+            return
+
+        old_pop = group.population
+        
+        # Cap based on max occupancy of current church level
+        max_occ = game_logic.get_max_occupancy(group.church_level)
+        new_pop = min(max_occ, old_pop + reward_amount)
+        group.population = new_pop
+        
+        await db.commit()
+
+    # Trigger AI news announcement
+    from app.services.ai_news import trigger_event_broadcast
+    import asyncio
+    asyncio.create_task(trigger_event_broadcast("super_pastor_claim", {
+        "group_name": group.name,
+        "reward_amount": reward_amount,
+        "old_population": old_pop,
+        "new_population": new_pop,
+    }))
+
+    text = (
+        f"🎉 *Super Pastor Claimed Successfully!* 🏆\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"Congratulations! Your group *{group.name}* claimed the Super Pastor first! 🏃‍♂️💨\n\n"
+        f"👥 Population: *{int(old_pop):,}* → *{int(new_pop):,}* (+{reward_amount} members)!"
+    )
+    if new_pop == max_occ and old_pop + reward_amount > max_occ:
+        text += "\n\n⚠️ *WARNING:* Population capped at max occupancy!"
+
+    await callback.message.edit_text(
+        text,
+        parse_mode="Markdown",
+        reply_markup=None,
+    )
+    await callback.answer("Super Pastor claimed successfully!")
+

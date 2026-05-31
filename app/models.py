@@ -292,3 +292,37 @@ class TimedEvent(Base):
 
     def __repr__(self) -> str:
         return f"<TimedEvent id={self.id} name={self.name!r}>"
+
+
+class GlobalState(Base):
+    __tablename__ = "global_state"
+
+    key = Column(String(100), primary_key=True)
+    value_str = Column(String(500), nullable=True)
+    value_int = Column(Integer, nullable=True)
+    value_bool = Column(Boolean, nullable=True)
+
+    def __repr__(self) -> str:
+        return f"<GlobalState key={self.key!r} str={self.value_str!r} int={self.value_int!r} bool={self.value_bool!r}>"
+
+
+class GroupQuizState(Base):
+    """Tracks each group's per-question progress through a Corruption quiz event."""
+
+    __tablename__ = "group_quiz_state"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    group_id = Column(Integer, ForeignKey("groups.id"), nullable=False, unique=True)
+    current_question_index = Column(Integer, nullable=False, default=0)
+    correct_count = Column(Integer, nullable=False, default=0)
+    wrong_count = Column(Integer, nullable=False, default=0)
+    completed = Column(Boolean, nullable=False, default=False)
+    started_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    group = relationship("Group", foreign_keys=[group_id])
+
+    def __repr__(self) -> str:
+        return (
+            f"<GroupQuizState group={self.group_id} q={self.current_question_index}"
+            f" correct={self.correct_count} wrong={self.wrong_count} done={self.completed}>"
+        )
