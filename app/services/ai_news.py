@@ -69,83 +69,53 @@ async def generate_gemini_news(prompt: str) -> str:
 def build_news_prompt(event_type: str, details: dict, standings: list[str], history_logs: list[str], tone: str | None = None) -> str:
     """
     Constructs the dynamic prompt detailing expectations, the event, recent history, and standings.
+    Only called for standard game actions and timed event results/expirations.
     """
-    timed_event_types = {
-        "super_pastor_start",
-        "super_pastor_claim",
-        "super_pastor_expired",
-        "infestation_start",
-        "infestation_result",
-        "corruption_start",
-        "corruption_result",
-    }
-    is_emergency = event_type in timed_event_types
+    if not tone:
+        import random
+        tone = random.choice(["sarcastic", "encouraging", "hype"])
 
-    if is_emergency:
-        system_instructions = (
-            "You are 'The MYLC TIMES', reporting an urgent emergency broadcast in a competitive church-building game.\n"
-            "Your tone is informative, urgent, clear, and direct. Focus only on the broadcast facts with less yapping, no puns or sarcasm, and more real information.\n\n"
-            "Generate an urgent emergency broadcast bulletin of the event that just occurred.\n\n"
-            "Writing Style & Tone Rules:\n"
-            "1. Open the event summary dynamically with a dramatic, high-stakes opening. Keep the explanation precise and serious.\n"
-            "2. Focus entirely on the event, its rules, implications, or results. Do not add commentary or tease groups.\n"
-            "3. Do NOT use any em-dashes (—) or colons (:) in the entire output.\n"
-            "4. Use raw digits for all numbers, populations, and level numbers. Do NOT spell out numbers as words.\n"
-            "5. Whenever referring to any specific group names, always bold them using HTML tags (e.g., write '<b>Group 1</b>').\n"
-            "6. Drop a few expressive, relevant reaction emojis here and there naturally (e.g., ⚠️, 🚨, ⏰, 🐛, ⛪, 🏃‍♂️💨, 👥).\n\n"
-            "Formatting Rules:\n"
-            "1. Write the message in exactly two sections separated by a single blank line (two newlines):\n"
-            "   - Section 1 (Title): Strictly output '📻 <b>THE MYLC TIMES</b> 🚨 EMERGENCY REPORT'\n"
-            "   - Section 2 (Emergency Broadcast): Summarize the event, rules, or results clearly and informatively, with zero commentary or extra filler.\n"
-            "2. Do NOT use markdown asterisks (**) for bolding. Use HTML bold tags (<b>...</b>) for any bolding.\n"
-            "3. Keep the total message under 100 words."
+    if tone == "encouraging":
+        tone_rule = (
+            "For Section 3 (Implications / Commentary), you MUST write in a highly encouraging, positive, warm, and supportive tone. "
+            "Celebrate the leading group's hard work, cheer on the lagging groups to keep fighting and building, and inspire a sense "
+            "of friendly fellowship, hope, and community growth. Avoid any sarcasm, mockery, or cynicism in this section."
+        )
+    elif tone == "hype":
+        tone_rule = (
+            "For Section 3 (Implications / Commentary), you MUST write in an epic, highly dramatic, and high-energy sports commentator tone. "
+            "Hype up the rising stakes, paint the leading group as a mighty giant, build up the suspense and leaderboard rivalry, and make "
+            "it feel like a grand, action-packed showdown. Avoid sarcastic roasting; focus on high-stakes competition."
         )
     else:
-        if not tone:
-            import random
-            tone = random.choice(["sarcastic", "encouraging", "hype"])
-
-        if tone == "encouraging":
-            tone_rule = (
-                "For Section 3 (Implications / Commentary), you MUST write in a highly encouraging, positive, warm, and supportive tone. "
-                "Celebrate the leading group's hard work, cheer on the lagging groups to keep fighting and building, and inspire a sense "
-                "of friendly fellowship, hope, and community growth. Avoid any sarcasm, mockery, or cynicism in this section."
-            )
-        elif tone == "hype":
-            tone_rule = (
-                "For Section 3 (Implications / Commentary), you MUST write in an epic, highly dramatic, and high-energy sports commentator tone. "
-                "Hype up the rising stakes, paint the leading group as a mighty giant, build up the suspense and leaderboard rivalry, and make "
-                "it feel like a grand, action-packed showdown. Avoid sarcastic roasting; focus on high-stakes competition."
-            )
-        else:
-            tone_rule = (
-                "For Section 3 (Implications / Commentary), you MUST write in a highly sarcastic, dryly witty, and cheeky tone. "
-                "Playfully roast the slacking groups who are stuck at their starting populations or napping in the back pews, comparing them "
-                "to statues and teasing them for falling behind."
-            )
-
-        system_instructions = (
-            "You are 'The MYLC TIMES', a witty, cheeky, and high-energy AI news anchor reporting on "
-            "a competitive church-building game. Your tone is a natural, authentic blend of a dramatic sports commentator "
-            "and a cheeky news reporter. Keep it realistic, witty, and engaging.\n\n"
-            "Generate a highly entertaining, creative broadcast summary of the event that just occurred and its leaderboard impact.\n\n"
-            "Writing Style & Tone Rules:\n"
-            "1. Open the event summary dynamically with a diverse, creative, and engaging opening hook. Do NOT always start with the same word or use repetitive rumor/gossip cliches.\n"
-            "2. Make clever, safe, and humorous wordplay or puns based on the group's name, depending on their performance or leaderboard standing (e.g., if a group named 'United' is winning, write 'they truly are united!', but if they are losing, write 'are they really united?').\n"
-            "3. Look closely at the RECENT GAME HISTORY section to notice patterns, streaks, or repeating actions (e.g., a group doing multiple upgrades in a row, or stealing repeatedly from the same rival) and reference these rivalries or momentum hilariously in your commentary.\n"
-            "4. Do NOT use any em-dashes (—) or colons (:) in the entire output.\n"
-            "5. Use raw digits for all numbers, populations, and level numbers (e.g., write 'Level 2' instead of 'rank two' or 'two', and '52' instead of 'fifty two' or 'fifty-two'). Do NOT spell out numbers as words.\n"
-            "6. Whenever referring to any specific group names in the event or standings, always bold them using HTML tags (e.g., write '<b>Group 1</b>' or '<b>good church</b>').\n"
-            "7. Drop a few expressive, relevant reaction emojis here and there naturally throughout the message to make the bulletin visually engaging for Telegram (prefer reaction/human emojis like strong biceps 💪, laughing/crying-laughing 😂/🤣, eyes 👀, shushing 🤫, shocked 😱, fire 🔥, or celebrating 🎉 instead of item emojis like hammers or churches, and do not oversaturate it).\n"
-            f"8. MANDATORY IMPLICATIONS TONE RULE: {tone_rule}\n\n"
-            "Formatting Rules:\n"
-            "1. Write the message in exactly three sections separated by single blank lines (two newlines):\n"
-            "   - Section 1 (Title): Strictly output '📻 <b>THE MYLC TIMES</b>'\n"
-            "   - Section 2 (Actual Event): Summarize what just happened in a realistic, witty style with a fresh, engaging opening hook.\n"
-            "   - Section 3 (Implications / Commentary): Discuss the leaderboard standings, group progress, or other groups' reactions based on the MANDATORY IMPLICATIONS TONE RULE.\n"
-            "2. Do NOT use markdown asterisks (**) for bolding. Use HTML bold tags (<b>...</b>) for any bolding to ensure Telegram parses it correctly.\n"
-            "3. Keep the total message under 100 words."
+        tone_rule = (
+            "For Section 3 (Implications / Commentary), you MUST write in a highly sarcastic, dryly witty, and cheeky tone. "
+            "Playfully roast the slacking groups who are stuck at their starting populations or napping in the back pews, comparing them "
+            "to statues and teasing them for falling behind."
         )
+
+    system_instructions = (
+        "You are 'The MYLC TIMES', a witty, cheeky, and high-energy AI news anchor reporting on "
+        "a competitive church-building game. Your tone is a natural, authentic blend of a dramatic sports commentator "
+        "and a cheeky news reporter. Keep it realistic, witty, and engaging.\n\n"
+        "Generate a highly entertaining, creative broadcast summary of the event that just occurred and its leaderboard impact.\n\n"
+        "Writing Style & Tone Rules:\n"
+        "1. Open the event summary dynamically with a diverse, creative, and engaging opening hook. Do NOT always start with the same word or use repetitive rumor/gossip cliches.\n"
+        "2. Make clever, safe, and humorous wordplay or puns based on the group's name, depending on their performance or leaderboard standing (e.g., if a group named 'United' is winning, write 'they truly are united!', but if they are losing, write 'are they really united?').\n"
+        "3. Look closely at the RECENT GAME HISTORY section to notice patterns, streaks, or repeating actions (e.g., a group doing multiple upgrades in a row, or stealing repeatedly from the same rival) and reference these rivalries or momentum hilariously in your commentary.\n"
+        "4. Do NOT use any em-dashes (—) or colons (:) in the entire output.\n"
+        "5. Use raw digits for all numbers, populations, and level numbers (e.g., write 'Level 2' instead of 'rank two' or 'two', and '52' instead of 'fifty two' or 'fifty-two'). Do NOT spell out numbers as words.\n"
+        "6. Whenever referring to any specific group names in the event or standings, always bold them using HTML tags (e.g., write '<b>Group 1</b>' or '<b>good church</b>').\n"
+        "7. Drop a few expressive, relevant reaction emojis here and there naturally throughout the message to make the bulletin visually engaging for Telegram (prefer reaction/human emojis like strong biceps 💪, laughing/crying-laughing 😂/🤣, eyes 👀, shushing 🤫, shocked 😱, fire 🔥, or celebrating 🎉 instead of item emojis like hammers or churches, and do not oversaturate it).\n"
+        f"8. MANDATORY IMPLICATIONS TONE RULE: {tone_rule}\n\n"
+        "Formatting Rules:\n"
+        "1. Write the message in exactly three sections separated by single blank lines (two newlines):\n"
+        "   - Section 1 (Title): Strictly output '📻 <b>THE MYLC TIMES</b>'\n"
+        "   - Section 2 (Actual Event): Summarize what just happened in a realistic, witty style with a fresh, engaging opening hook.\n"
+        "   - Section 3 (Implications / Commentary): Discuss the leaderboard standings, group progress, or other groups' reactions based on the MANDATORY IMPLICATIONS TONE RULE.\n"
+        "2. Do NOT use markdown asterisks (**) for bolding. Use HTML bold tags (<b>...</b>) for any bolding to ensure Telegram parses it correctly.\n"
+        "3. Keep the total message under 100 words."
+    )
 
     event_desc = ""
     if event_type == "upgrade":
@@ -170,12 +140,6 @@ def build_news_prompt(event_type: str, details: dict, standings: list[str], hist
         event_desc = (
             f"A brand new group named '{details['group_name']}' has officially entered the church-building race with an initial population of {int(details['population'])}!"
         )
-    elif event_type == "super_pastor_start":
-        event_desc = (
-            f"A legendary Super Pastor is now roaming the venue! The FIRST group to physically bring him the required items IRL will earn a massive reward of {details['reward_amount']} congregation members! "
-            f"Once your group has successfully presented the items to him in person, your leader can register the claim in the Admin Section. "
-            f"Remember — you must bring the goods to him first. Only then can you claim the reward! 🏃‍♂️💨"
-        )
     elif event_type == "super_pastor_claim":
         event_desc = (
             f"The Super Pastor has been claimed! Group '{details['group_name']}' successfully brought the items to him IRL and claimed the reward first! "
@@ -185,13 +149,6 @@ def build_news_prompt(event_type: str, details: dict, standings: list[str], hist
         event_desc = (
             "BREAKING: The Super Pastor has packed up and left the building — and nobody claimed him! "
             "The reward window has officially closed. Better luck next time, churches! 😔"
-        )
-    elif event_type == "infestation_start":
-        event_desc = (
-            f"URGENT: A rare breed of church-eating termites has been spotted in the area! "
-            f"Sources say they specifically target small, underdeveloped churches with weak ministry foundations. "
-            f"They are expected to strike within 20 minutes — any church that hasn't strengthened certain key ministry areas could lose up to {details['penalty']} congregation members! "
-            f"The clock is ticking. What have you been neglecting? 🐛⏰"
         )
     elif event_type == "infestation_result":
         failed = details.get("failed_groups", [])
@@ -205,28 +162,18 @@ def build_news_prompt(event_type: str, details: dict, standings: list[str], hist
             f"{len(failed)} church(es) fell short and lost {details['penalty']} congregation members each. "
             f"Failed: {failed_list}. Passed: {passed_list}."
         )
-
-    elif event_type == "corruption_start":
-        event_desc = (
-            "BREAKING: The Church Authority has launched an emergency legitimacy investigation! "
-            "Hearsay has it that some churches have been run by completely clueless leaders. "
-            "All church leaders must now complete a quiz to prove their knowledge of the CAC. "
-            "You have 20 minutes — every right answer grows your congregation, every wrong one shrinks it. "
-            "Don't complete the quiz in time? Assume you got everything wrong. 📜⏰"
-        )
     elif event_type == "corruption_result":
         penalized = details.get("penalized_groups", [])
         safe = details.get("safe_groups", [])
         penalized_names = ", ".join(f"<b>{g['name']}</b>" for g in penalized) or "none"
         safe_names = ", ".join(f"<b>{g['name']}</b>" for g in safe) or "none"
         event_desc = (
-            f"The Corruption of Leaders investigation is now closed! "
+            f"The Corruption of Leaders legitimacy investigation is now officially closed! "
             f"{len(penalized)} group(s) failed to complete the quiz in time and were penalised for every unanswered question: {penalized_names}. "
-            f"Groups that proved their legitimacy: {safe_names}. The Church Authority thanks all participants! ⛪"
+            f"Groups that successfully proved their legitimacy by answering questions correctly: {safe_names}. The Church Authority thanks all participants! ⛪"
         )
     else:
         event_desc = f"An administrative event occurred for Group '{details.get('group_name', 'Unknown')}': {details.get('description', 'Status updated')}."
-
 
     standings_str = "\n".join(standings)
     history_str = "\n".join(history_logs) if history_logs else "No game history recorded yet."
@@ -251,69 +198,96 @@ async def trigger_event_broadcast(event_type: str, details: dict) -> None:
     logger.info("Triggered event-driven news broadcast for event type: %s", event_type)
 
     try:
-        # 1. Fetch current standings and recent history
-        standings = []
-        history_logs = []
-        async with AsyncSessionLocal() as session:
-            # Standings
-            groups_stmt = select(Group).order_by(Group.population.desc())
-            groups = (await session.execute(groups_stmt)).scalars().all()
-            for idx, g in enumerate(groups):
-                standings.append(f"{idx + 1}. {g.name} ({int(g.population)} members)")
+        hardcoded_event_starts = {
+            "super_pastor_start",
+            "infestation_start",
+            "corruption_start",
+        }
 
-            # Recent History: Last 5 standard completions
-            from app.models import GroupStationProgress, StealRecord, StationLevel, Station
-            from sqlalchemy.orm import selectinload
-
-            progress_stmt = (
-                select(GroupStationProgress)
-                .options(
-                    selectinload(GroupStationProgress.group),
-                    selectinload(GroupStationProgress.station_level).selectinload(StationLevel.station)
+        if event_type in hardcoded_event_starts:
+            header = "📻 <b>THE MYLC TIMES</b> 🚨 EMERGENCY REPORT\n\n"
+            if event_type == "super_pastor_start":
+                news_text = (
+                    f"{header}A legendary Super Pastor is now roaming around the venue!\n\n"
+                    f"Leaders, find him and present the required items IRL. The FIRST group to claim him via the Claim button in their Admin Section gets a huge reward of {details.get('reward_amount', 1000)} members! 🏃‍♂️💨\n\n"
+                    f"Remember, you must bring the goods to him first. Only then can you claim the reward!"
                 )
-                .order_by(GroupStationProgress.completed_at.desc())
-                .limit(5)
-            )
-            progress_records = (await session.execute(progress_stmt)).scalars().all()
-
-            # Recent History: Last 5 steals
-            steal_stmt = (
-                select(StealRecord)
-                .options(
-                    selectinload(StealRecord.stealer_group),
-                    selectinload(StealRecord.target_group)
+            elif event_type == "infestation_start":
+                news_text = (
+                    f"{header}URGENT: A rare breed of church-eating termites has been spotted in the area! 🐛⏰\n\n"
+                    f"Sources say they specifically target small, underdeveloped churches with weak ministry foundations.\n\n"
+                    f"They are expected to strike within 20 minutes. Any church that hasn't strengthened their ministries to a total score cutoff of <b>{details.get('cutoff', 0)}</b> could lose up to {details.get('penalty', 300)} congregation members!"
                 )
-                .order_by(StealRecord.created_at.desc())
-                .limit(5)
-            )
-            steal_records = (await session.execute(steal_stmt)).scalars().all()
+            elif event_type == "corruption_start":
+                news_text = (
+                    f"{header}BREAKING: The Church Authority has launched an emergency legitimacy investigation! 📜⏰\n\n"
+                    f"Hearsay has it that some churches have been run by completely clueless leaders. All church leaders must prove their legitimacy NOW in the Admin Section.\n\n"
+                    f"You have 20 minutes. Every right answer grows your congregation (+10%), every wrong one shrinks it (-5%). If you do not complete the quiz in time, you lose -5% per unanswered question!"
+                )
+        else:
+            # 1. Fetch current standings and recent history
+            standings = []
+            history_logs = []
+            async with AsyncSessionLocal() as session:
+                # Standings
+                groups_stmt = select(Group).order_by(Group.population.desc())
+                groups = (await session.execute(groups_stmt)).scalars().all()
+                for idx, g in enumerate(groups):
+                    standings.append(f"{idx + 1}. {g.name} ({int(g.population)} members)")
 
-            # Compile history events
-            history_events = []
-            for p in progress_records:
-                history_events.append({
-                    "time": p.completed_at,
-                    "desc": f"Group '{p.group.name if p.group else 'Unknown Group'}' upgraded '{p.station_level.station.name if p.station_level and p.station_level.station else 'Unknown Station'}' to Level {p.station_level.level_number if p.station_level else 0}."
-                })
-            for s in steal_records:
-                history_events.append({
-                    "time": s.created_at,
-                    "desc": f"Group '{s.stealer_group.name if s.stealer_group else 'Unknown Group'}' upgraded their Church and stole {int(s.amount)} members from Group '{s.target_group.name if s.target_group else 'Unknown Group'}'."
-                })
+                # Recent History: Last 5 standard completions
+                from app.models import GroupStationProgress, StealRecord, StationLevel, Station
+                from sqlalchemy.orm import selectinload
 
-            # Sort combined history chronologically (oldest to newest)
-            history_events.sort(key=lambda x: x["time"], reverse=True)
-            recent_history = history_events[:5]
-            recent_history.reverse()
-            history_logs = [f"- {item['desc']}" for item in recent_history]
+                progress_stmt = (
+                    select(GroupStationProgress)
+                    .options(
+                        selectinload(GroupStationProgress.group),
+                        selectinload(GroupStationProgress.station_level).selectinload(StationLevel.station)
+                    )
+                    .order_by(GroupStationProgress.completed_at.desc())
+                    .limit(5)
+                )
+                progress_records = (await session.execute(progress_stmt)).scalars().all()
 
-        # 2. Build prompt
-        import random
-        selected_tone = random.choice(["sarcastic", "encouraging", "hype"])
-        prompt = build_news_prompt(event_type, details, standings, history_logs, tone=selected_tone)
+                # Recent History: Last 5 steals
+                steal_stmt = (
+                    select(StealRecord)
+                    .options(
+                        selectinload(StealRecord.stealer_group),
+                        selectinload(StealRecord.target_group)
+                    )
+                    .order_by(StealRecord.created_at.desc())
+                    .limit(5)
+                )
+                steal_records = (await session.execute(steal_stmt)).scalars().all()
 
-        # 4. Generate AI summary
-        news_text = await generate_gemini_news(prompt)
+                # Compile history events
+                history_events = []
+                for p in progress_records:
+                    history_events.append({
+                        "time": p.completed_at,
+                        "desc": f"Group '{p.group.name if p.group else 'Unknown Group'}' upgraded '{p.station_level.station.name if p.station_level and p.station_level.station else 'Unknown Station'}' to Level {p.station_level.level_number if p.station_level else 0}."
+                    })
+                for s in steal_records:
+                    history_events.append({
+                        "time": s.created_at,
+                        "desc": f"Group '{s.stealer_group.name if s.stealer_group else 'Unknown Group'}' upgraded their Church and stole {int(s.amount)} members from Group '{s.target_group.name if s.target_group else 'Unknown Group'}'."
+                    })
+
+                # Sort combined history chronologically (oldest to newest)
+                history_events.sort(key=lambda x: x["time"], reverse=True)
+                recent_history = history_events[:5]
+                recent_history.reverse()
+                history_logs = [f"- {item['desc']}" for item in recent_history]
+
+            # 2. Build prompt
+            import random
+            selected_tone = random.choice(["sarcastic", "encouraging", "hype"])
+            prompt = build_news_prompt(event_type, details, standings, history_logs, tone=selected_tone)
+
+            # 4. Generate AI summary
+            news_text = await generate_gemini_news(prompt)
 
         # 5. Broadcast to all active chat sessions
         from aiogram import Bot
