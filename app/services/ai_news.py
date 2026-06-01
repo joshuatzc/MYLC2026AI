@@ -48,7 +48,7 @@ async def generate_gemini_news(prompt: str) -> str:
 
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=payload, timeout=20) as response:
+            async with session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=60)) as response:
                 if response.status == 200:
                     data = await response.json()
                     try:
