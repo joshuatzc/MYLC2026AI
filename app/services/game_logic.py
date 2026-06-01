@@ -792,7 +792,7 @@ async def check_and_broadcast_upgrade_eligibility(
             f"🎉 Great news, <b>{group.name}</b>!\n"
             f"Your congregation has reached <b>{int(new_pop):,}</b> members, passing the threshold of <b>{threshold:,}</b>!\n\n"
             f"You are now eligible to upgrade to a <b>{tier_name}</b> (Level {next_level})! 🏛️\n"
-            f"Head over to a physical station or access the <b>🔑 Admin Section</b> to perform the upgrade."
+            f"Head over to the physical station to upgrade! Hints are available in the <b>🔑 Admin Section</b>."
         )
 
         bot = Bot(
