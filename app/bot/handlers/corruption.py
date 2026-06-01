@@ -2,7 +2,7 @@
 bot/handlers/corruption.py – Corruption of Leaders quiz flow.
 
 Scoring:
-  - Right answer:    +10% population (sequential, capped at church max)
+  - Right answer:    +15% population (sequential, capped at church max)
   - Wrong answer:    -5%  population (sequential, floor at 10)
   - Timeout (20s):   -5%  population (same as wrong, auto-advances)
 
@@ -346,7 +346,7 @@ async def _briefing_countdown_task(chat_id: str, message_id: int) -> None:
                 f"• You only have <b>20 seconds</b> to answer each question!\n"
                 f"• The timer starts as soon as you press the button below.\n\n"
                 f"📈 <b>CONSEQUENCES:</b>\n"
-                f"• ✅ <b>Correct Answer:</b> <b>+10%</b> congregation members\n"
+                f"• ✅ <b>Correct Answer:</b> <b>+15%</b> congregation members\n"
                 f"• ❌ <b>Wrong Answer / Timeout:</b> <b>-5%</b> congregation members\n"
                 f"• ⏰ <b>Not Completing:</b> <b>-5%</b> per unanswered question when the event ends!\n\n"
                 f"⏱️ <b>Global Event Time Remaining:</b>\n"
@@ -441,7 +441,7 @@ async def cb_start_corruption_quiz(callback: CallbackQuery) -> None:
             f"• You only have <b>20 seconds</b> to answer each question!\n"
             f"• The timer starts as soon as you press the button below.\n\n"
             f"📈 <b>CONSEQUENCES:</b>\n"
-            f"• ✅ <b>Correct Answer:</b> <b>+10%</b> congregation members\n"
+            f"• ✅ <b>Correct Answer:</b> <b>+15%</b> congregation members\n"
             f"• ❌ <b>Wrong Answer / Timeout:</b> <b>-5%</b> congregation members\n"
             f"• ⏰ <b>Not Completing:</b> <b>-5%</b> per unanswered question when the event ends!\n\n"
             f"⏱️ <b>Global Event Time Remaining:</b>\n"
@@ -600,7 +600,7 @@ async def cb_corruption_answer(callback: CallbackQuery) -> None:
         if is_correct:
             new_pop = min(
                 float(game_logic.get_max_occupancy(group.church_level)),
-                old_pop * 1.1,
+                old_pop * 1.15,
             )
             quiz_state.correct_count += 1
         else:
@@ -621,6 +621,10 @@ async def cb_corruption_answer(callback: CallbackQuery) -> None:
         group_name = group.name
 
         await db.commit()
+
+        # Trigger eligibility check on correct answer
+        if is_correct:
+            game_logic.trigger_eligibility_check(group_id, old_pop, new_pop)
 
     # ---- Edit question message with result -----------------------------------
     result_icon = "✅" if is_correct else "❌"

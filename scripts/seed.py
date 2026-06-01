@@ -35,7 +35,7 @@ STATIONS: list[str] = [
 ]
 
 # Reward multipliers per level (index 0 = Level 1, etc.)
-MULTIPLIERS = [1.2, 1.5, 3.0]
+MULTIPLIERS = [1.3, 1.7, 3.0]
 
 # ---------------------------------------------------------------------------
 # Hint texts  (vague / story-style, shown to all players)
@@ -101,64 +101,32 @@ GROUPS: list[str] = [f"Group {i}" for i in range(1, 15)]  # Group 1 … Group 14
 # Format: (station_that_needs_prereq, level, required_station, required_level)
 #
 # Rules implemented:
-#   1. All stations: must complete Level N before Level N+1  (same-station sequential)
-#   2. Worship Team L2 → Sound Crew L1 + Powerpoint L1
-#      Worship Team L3 → Sound Crew L2 + Powerpoint L2
-#   3. Welcome Team L1 → Social Media L1
-#      Welcome Team L2 → Social Media L2   (+ Welcome L1 from rule 1)
-#      Welcome Team L3 → Social Media L3   (+ Welcome L2 from rule 1)
-#   4. Children Ministry L2 → Welcome Team L1  (+ Children L1 from rule 1)
-#      Children Ministry L3 → Welcome Team L2  (+ Children L2 from rule 1)
-#   5. Preachers L1 → Powerpoint L1
-#      Preachers L2 → Finance L1 + Powerpoint L2  (+ Preachers L1 from rule 1)
-#      Preachers L3 → Finance L2 + Powerpoint L3  (+ Preachers L2 from rule 1)
-#   Social Media, Finance, Sound Crew, Powerpoint: only sequential within-station
+#   1. All stations: must complete Level N before Level N+1 (same-station sequential)
+#      Level 1s have no prerequisites.
+#      Level 2s need Level 1 of that same ministry.
+#      Level 3s need Level 2 of that same ministry.
 # ---------------------------------------------------------------------------
 
 PREREQS: list[tuple[str, int, str, int]] = [
-    # ── Same-station sequential (all 8 stations, levels 2 and 3) ──────────
-    ("Social Media",        2, "Social Media",        1),
-    ("Social Media",        3, "Social Media",        2),
-    ("Worship Team",        2, "Worship Team",        1),
-    ("Worship Team",        3, "Worship Team",        2),
-    ("Sound Crew",          2, "Sound Crew",          1),
-    ("Sound Crew",          3, "Sound Crew",          2),
-    ("Powerpoint Team",     2, "Powerpoint Team",     1),
-    ("Powerpoint Team",     3, "Powerpoint Team",     2),
-    ("Preachers",           2, "Preachers",           1),
-    ("Preachers",           3, "Preachers",           2),
+    # ── Same-station sequential (all 9 stations, levels 2 and 3) ──────────
+    ("Social Media",          2, "Social Media",          1),
+    ("Social Media",          3, "Social Media",          2),
+    ("Worship Team",          2, "Worship Team",          1),
+    ("Worship Team",          3, "Worship Team",          2),
+    ("Sound Crew",            2, "Sound Crew",            1),
+    ("Sound Crew",            3, "Sound Crew",            2),
+    ("Powerpoint Team",       2, "Powerpoint Team",       1),
+    ("Powerpoint Team",       3, "Powerpoint Team",       2),
+    ("Preachers",             2, "Preachers",             1),
+    ("Preachers",             3, "Preachers",             2),
     ("Welcome Team / Ushers", 2, "Welcome Team / Ushers", 1),
     ("Welcome Team / Ushers", 3, "Welcome Team / Ushers", 2),
-    ("Children Ministry",   2, "Children Ministry",   1),
-    ("Children Ministry",   3, "Children Ministry",   2),
-    ("Finance",             2, "Finance",             1),
-    ("Finance",             3, "Finance",             2),
-    ("Church Upgrade",      2, "Church Upgrade",      1),
-    ("Church Upgrade",      3, "Church Upgrade",      2),
-
-    # ── Worship Team: needs previous-level Sound Crew + Powerpoint ────────
-    # L1 has no external prereq (needs "L0" which doesn't exist)
-    ("Worship Team",        2, "Sound Crew",          1),
-    ("Worship Team",        2, "Powerpoint Team",     1),
-    ("Worship Team",        3, "Sound Crew",          2),
-    ("Worship Team",        3, "Powerpoint Team",     2),
-
-    # ── Welcome Team: needs same-level Social Media ───────────────────────
-    ("Welcome Team / Ushers", 1, "Social Media",      1),
-    ("Welcome Team / Ushers", 2, "Social Media",      2),
-    ("Welcome Team / Ushers", 3, "Social Media",      3),
-
-    # ── Children Ministry: needs previous-level Welcome Team ──────────────
-    # L1 has no external prereq (needs "L0" Welcome which doesn't exist)
-    ("Children Ministry",   2, "Welcome Team / Ushers", 1),
-    ("Children Ministry",   3, "Welcome Team / Ushers", 2),
-
-    # ── Preachers: needs same-level Powerpoint + previous-level Finance ───
-    ("Preachers",           1, "Powerpoint Team",     1),          # Finance L0 = none
-    ("Preachers",           2, "Powerpoint Team",     2),
-    ("Preachers",           2, "Finance",             1),
-    ("Preachers",           3, "Powerpoint Team",     3),
-    ("Preachers",           3, "Finance",             2),
+    ("Children Ministry",     2, "Children Ministry",     1),
+    ("Children Ministry",     3, "Children Ministry",     2),
+    ("Finance",               2, "Finance",               1),
+    ("Finance",               3, "Finance",               2),
+    ("Church Upgrade",        2, "Church Upgrade",        1),
+    ("Church Upgrade",        3, "Church Upgrade",        2),
 ]
 
 

@@ -67,7 +67,7 @@ async def handle_my_church(message: Message) -> None:
         lines.append(
             f"\n💡 *Prerequisite for {next_tier_name} (Level {next_level}):*\n"
             f"  • {status_symbol} Required population: *{min_pop}* (Current: *{int(group.population)}*)\n"
-            f"  • ⚡ Perk: Steal **{steal_amt}** members from a **{tier_name}** at upgrade time!"
+            f"  • ⚡ Perk: Steal **10%** of congregation members from any group at upgrade time!"
         )
         
         # Display purchased hints for this next level

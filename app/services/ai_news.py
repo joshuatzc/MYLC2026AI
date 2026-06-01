@@ -114,7 +114,7 @@ def build_news_prompt(event_type: str, details: dict, standings: list[str], hist
         "   - Section 2 (Actual Event): Summarize what just happened in a realistic, witty style with a fresh, engaging opening hook.\n"
         "   - Section 3 (Implications / Commentary): Discuss the leaderboard standings, group progress, or other groups' reactions based on the MANDATORY IMPLICATIONS TONE RULE.\n"
         "2. Do NOT use markdown asterisks (**) for bolding. Use HTML bold tags (<b>...</b>) for any bolding to ensure Telegram parses it correctly.\n"
-        "3. Keep the total message under 100 words."
+        "3. Keep the total message under 50 words."
     )
 
     event_desc = ""
@@ -236,7 +236,7 @@ async def trigger_event_broadcast(event_type: str, details: dict) -> None:
                 news_text = (
                     f"{header}BREAKING: The Church Authority has launched an emergency legitimacy investigation! 📜⏰\n\n"
                     f"Hearsay has it that some churches have been run by completely clueless leaders. All church leaders must prove their legitimacy NOW in the Admin Section.\n\n"
-                    f"You have 20 minutes. Every right answer grows your congregation (+10%), every wrong one shrinks it (-5%). If you do not complete the quiz in time, you lose -5% per unanswered question!"
+                    f"You have 20 minutes. Every right answer grows your congregation (+15%), every wrong one shrinks it (-5%). If you do not complete the quiz in time, you lose -5% per unanswered question!"
                 )
         else:
             # 1. Fetch current standings and recent history

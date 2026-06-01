@@ -405,7 +405,7 @@ async def cb_admin_upgrade_detail(callback: CallbackQuery) -> None:
                     f"👥 Current Population: **{int(group.population):,}** (Min required: {min_pop})\n"
                     f"👥 New Max Occupancy: **{new_max:,}**\n"
                     f"📈 Station Earning Bonus: **+{current_bonus_pct}%** (`+{next_boost}%` if upgraded now! 🏆)\n"
-                    f"⚡ *Special Perk:* Steal up to **{steal_amt}** members from any group at **{current_tier}**!\n\n"
+                    f"⚡ *Special Perk:* Steal **10%** of congregation members from any group, regardless of church level!\n\n"
                     f"💡 Hint: _{level.hint_text}_\n\n"
                     f"Are you sure you want to upgrade your church?"
                 )
@@ -533,7 +533,7 @@ async def cb_admin_confirm(callback: CallbackQuery) -> None:
                 f"⚡ *Church Upgrade — Select Theft Target* ⚡\n"
                 f"━━━━━━━━━━━━━━━━━━━\n"
                 f"You are upgrading to a **{new_tier}**!\n"
-                f"This permits a one-time absolute theft of up to **{steal_amt}** members from any group at your current tier (**{current_tier}**).\n\n"
+                f"This permits a one-time theft of **10%** of their congregation members from any group regardless of their church level.\n\n"
                 f"⚠️ *Safety Net:* You can only steal from a group until they have **10 members** remaining. They will never go below this 10-member safety net.\n\n"
                 f"Select a group to steal from, or skip the theft to upgrade immediately:"
             )
@@ -833,6 +833,9 @@ async def cb_claim_super_pastor(callback: CallbackQuery) -> None:
         group.population = new_pop
         
         await db.commit()
+
+        # Trigger eligibility check
+        game_logic.trigger_eligibility_check(group_id, old_pop, new_pop)
 
     # Trigger AI news announcement
     from app.services.ai_news import trigger_event_broadcast

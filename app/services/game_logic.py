@@ -29,10 +29,10 @@ from app.models import (
 # ---------------------------------------------------------------------------
 
 CHURCH_TIERS = {
-    0: {"name": "Home Church", "max_occupancy": 30, "bonus": 0.0, "min_population": 0, "steal_amount": 0},
-    1: {"name": "Family Church", "max_occupancy": 500, "bonus": 0.10, "min_population": 15, "steal_amount": 15},
-    2: {"name": "Mega Church", "max_occupancy": 10000, "bonus": 0.20, "min_population": 300, "steal_amount": 150},
-    3: {"name": "Giga Church", "max_occupancy": 10000000, "bonus": 0.30, "min_population": 3000, "steal_amount": 2000},
+    0: {"name": "Home Church", "max_occupancy": 50, "bonus": 0.0, "min_population": 0, "steal_amount": 0},
+    1: {"name": "Family Church", "max_occupancy": 500, "bonus": 0.10, "min_population": 14, "steal_amount": 0},
+    2: {"name": "Mega Church", "max_occupancy": 10000, "bonus": 0.20, "min_population": 150, "steal_amount": 0},
+    3: {"name": "Giga Church", "max_occupancy": 10000000, "bonus": 0.30, "min_population": 1000, "steal_amount": 0},
 }
 
 CHURCH_HINTS = {
@@ -328,26 +328,18 @@ async def apply_level_upgrade(
         target_new_pop = 0
         theft_applied = False
 
-        # Apply absolute steal with safety net at upgrade time
         if steal_target_group_id is not None:
             target_res = await db.execute(select(Group).where(Group.id == steal_target_group_id))
             target_group = target_res.scalar_one_or_none()
             if target_group is None:
                 raise ValueError("Selected theft target group not found.")
 
-            # Victim must be at the stealer's CURRENT level (which is strictly 1 level below the new upgraded level!)
-            if target_group.church_level != group.church_level:
-                raise ValueError(
-                    f"You can only steal from groups currently at your tier ({get_church_tier_name(group.church_level)})! "
-                    f"Target is at {get_church_tier_name(target_group.church_level)}."
-                )
-
-            # Absolute steal amount for this upgrade level
-            absolute_steal = get_church_steal_amount(new_church_level)
+            # Calculate 10% of target group's population
+            calculated_steal = target_group.population * 0.10
 
             # Victim cannot go below 10 members safety net
             max_stolen = max(0.0, target_group.population - 10.0)
-            stolen_amount = round(min(float(absolute_steal), max_stolen))
+            stolen_amount = round(min(float(calculated_steal), max_stolen))
 
             if stolen_amount > 0:
                 target_name = target_group.name
@@ -397,6 +389,9 @@ async def apply_level_upgrade(
         db.add(progress)
         await db.commit()
 
+        # Trigger eligibility check in case they are now eligible for the NEXT level
+        trigger_eligibility_check(group_id, old_population, new_population)
+
         return {
             "station_name": target.station.name,
             "level_number": target.level_number,
@@ -440,6 +435,9 @@ async def apply_level_upgrade(
         group.population = new_population
         await db.commit()
 
+        # Trigger eligibility check
+        trigger_eligibility_check(group_id, old_population, new_population)
+
         return {
             "station_name": target.station.name,
             "level_number": target.level_number,
@@ -465,11 +463,10 @@ async def get_eligible_steal_targets_for_upgrade(
     group_id: int,
     current_church_level: int,
 ) -> list[dict[str, Any]]:
-    """Return all other groups whose church level is exactly equal to current_church_level."""
+    """Return all other groups regardless of their church level."""
     res = await db.execute(
         select(Group)
         .where(Group.id != group_id)
-        .where(Group.church_level == current_church_level)
         .order_by(Group.name)
     )
     targets = res.scalars().all()
@@ -745,3 +742,83 @@ def _level_to_dict(level: StationLevel) -> dict[str, Any]:
         "hint_text": level.hint_text,
         "reward_multiplier": level.reward_multiplier,
     }
+
+
+async def check_and_broadcast_upgrade_eligibility(
+    db: AsyncSession,
+    group_id: int,
+    old_pop: float,
+    new_pop: float,
+) -> None:
+    """
+    Check if a group's population has crossed the threshold for their next church level upgrade.
+    If so, broadcast a Telegram notification to that group only.
+    """
+    # 1. Fetch group
+    group_res = await db.execute(select(Group).where(Group.id == group_id))
+    group = group_res.scalar_one_or_none()
+    if not group:
+        return
+
+    # 2. Get next church upgrade level
+    next_level = group.church_level + 1
+    if next_level > 3:
+        return  # Already at max church level
+
+    # 3. Check threshold
+    threshold = get_church_min_pop(next_level)
+    if old_pop < threshold <= new_pop:
+        # We crossed the threshold!
+        # 4. Fetch all chat sessions for this group
+        from app.models import ChatState
+        cs_res = await db.execute(
+            select(ChatState.chat_id).where(ChatState.group_id == group_id)
+        )
+        chat_ids = cs_res.scalars().all()
+        if not chat_ids:
+            return
+
+        # 5. Broadcast message
+        from aiogram import Bot
+        from aiogram.client.default import DefaultBotProperties
+        from aiogram.enums import ParseMode
+        from app.config import settings
+        import asyncio
+
+        tier_name = get_church_tier_name(next_level)
+        message_text = (
+            f"🔔 <b>CHURCH ELIGIBLE FOR UPGRADE!</b> ⛪\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"🎉 Great news, <b>{group.name}</b>!\n"
+            f"Your congregation has reached <b>{int(new_pop):,}</b> members, passing the threshold of <b>{threshold:,}</b>!\n\n"
+            f"You are now eligible to upgrade to a <b>{tier_name}</b> (Level {next_level})! 🏛️\n"
+            f"Head over to a physical station or access the <b>🔑 Admin Section</b> to perform the upgrade."
+        )
+
+        bot = Bot(
+            token=settings.TELEGRAM_BOT_TOKEN,
+            default=DefaultBotProperties(parse_mode=ParseMode.HTML),
+        )
+        try:
+            for chat_id in chat_ids:
+                try:
+                    await bot.send_message(chat_id=chat_id, text=message_text)
+                    await asyncio.sleep(0.05)
+                except Exception as e:
+                    import logging
+                    logging.getLogger(__name__).warning("Failed to send eligibility broadcast to %s: %s", chat_id, e)
+        finally:
+            await bot.session.close()
+
+
+def trigger_eligibility_check(group_id: int, old_pop: float, new_pop: float) -> None:
+    """Spawns check_and_broadcast_upgrade_eligibility in a background task."""
+    import asyncio
+    asyncio.create_task(_check_and_broadcast_upgrade_eligibility_async(group_id, old_pop, new_pop))
+
+
+async def _check_and_broadcast_upgrade_eligibility_async(group_id: int, old_pop: float, new_pop: float) -> None:
+    from app.database import AsyncSessionLocal
+    async with AsyncSessionLocal() as db:
+        await check_and_broadcast_upgrade_eligibility(db, group_id, old_pop, new_pop)
+
