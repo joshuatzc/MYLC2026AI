@@ -30,6 +30,7 @@ class Settings:
     # --- Gemini & AI News ---
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
     GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
+    GEMINI_THINKING_LEVEL: str = os.getenv("GEMINI_THINKING_LEVEL", "HIGH")
 
 
 
