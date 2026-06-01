@@ -239,12 +239,19 @@ async def safe_edit_message_text(bot: Bot, chat_id: str, message_id: int, text: 
 
 
 def build_emergency_message(event_type: str, details: dict, remaining_minutes: int) -> str:
-    """Formats the emergency broadcast message text with a live countdown timer."""
+    """Formats the emergency broadcast message text with a live countdown timer progress bar."""
     header = "📻 <b>THE MYLC TIMES</b> 🚨 EMERGENCY REPORT\n\n"
+    
+    # Calculate visual timer progress bar
+    duration_minutes = details.get("duration_minutes", 20)
     if remaining_minutes <= 0:
-        timer_str = "⏱️ <b>Time Remaining:</b> 🔴 <b>Event Ended</b>"
+        bar = "<code>[░░░░░░░░░░]</code>"
+        timer_str = f"⏱️ <b>Time Remaining:</b> {bar} 🔴 <b>Event Ended</b>"
     else:
-        timer_str = f"⏱️ <b>Time Remaining:</b> ⏳ <b>{remaining_minutes}m</b> remaining"
+        percentage = max(0.0, min(1.0, remaining_minutes / duration_minutes))
+        filled_blocks = round(percentage * 10)
+        bar = f"<code>[{'█' * filled_blocks}{'░' * (10 - filled_blocks)}]</code>"
+        timer_str = f"⏱️ <b>Time Remaining:</b> {bar} ⏳ <b>{remaining_minutes}m</b> remaining"
 
     if event_type == "super_pastor_start":
         return (
@@ -264,7 +271,10 @@ def build_emergency_message(event_type: str, details: dict, remaining_minutes: i
         return (
             f"{header}URGENT: A rare breed of church-eating termites has been spotted in the area! 🐛⏰\n\n"
             f"Sources say they specifically target small, underdeveloped churches with weak ministry foundations.\n\n"
-            f"They are expected to strike soon. Any church that hasn't strengthened their ministries to a total score cutoff of <b>{details.get('cutoff', 0)}</b> could lose up to {details.get('penalty', 300)} congregation members!\n\n"
+            f"They are expected to strike soon. Any church that hasn't strengthened their ministries to a **total development score** cutoff of <b>{details.get('cutoff', 0)}</b> could lose up to {details.get('penalty', 300)} congregation members!\n\n"
+            f"ℹ️ <b>What is your Total Development Score?</b>\n"
+            f"It is the sum of your **Church Level** + **all completed Ministry Levels** (e.g. Social Media, Worship, Sound, etc.).\n"
+            f"👉 You can check your group's current score and individual ministry levels inside your <b>⛪ My Church</b> tab on the keyboard!\n\n"
             f"{timer_str}"
         )
     elif event_type == "corruption_start":
@@ -412,68 +422,68 @@ async def trigger_event_broadcast(event_type: str, details: dict) -> None:
             return
 
         # 1. Fetch current standings and recent history
-            standings = []
-            history_logs = []
-            async with AsyncSessionLocal() as session:
-                # Standings
-                groups_stmt = select(Group).order_by(Group.population.desc())
-                groups = (await session.execute(groups_stmt)).scalars().all()
-                for idx, g in enumerate(groups):
-                    standings.append(f"{idx + 1}. {g.name} ({int(g.population)} members)")
+        standings = []
+        history_logs = []
+        async with AsyncSessionLocal() as session:
+            # Standings
+            groups_stmt = select(Group).order_by(Group.population.desc())
+            groups = (await session.execute(groups_stmt)).scalars().all()
+            for idx, g in enumerate(groups):
+                standings.append(f"{idx + 1}. {g.name} ({int(g.population)} members)")
 
-                # Recent History: Last 5 standard completions
-                from app.models import GroupStationProgress, StealRecord, StationLevel, Station
-                from sqlalchemy.orm import selectinload
+            # Recent History: Last 5 standard completions
+            from app.models import GroupStationProgress, StealRecord, StationLevel, Station
+            from sqlalchemy.orm import selectinload
 
-                progress_stmt = (
-                    select(GroupStationProgress)
-                    .options(
-                        selectinload(GroupStationProgress.group),
-                        selectinload(GroupStationProgress.station_level).selectinload(StationLevel.station)
-                    )
-                    .order_by(GroupStationProgress.completed_at.desc())
-                    .limit(5)
+            progress_stmt = (
+                select(GroupStationProgress)
+                .options(
+                    selectinload(GroupStationProgress.group),
+                    selectinload(GroupStationProgress.station_level).selectinload(StationLevel.station)
                 )
-                progress_records = (await session.execute(progress_stmt)).scalars().all()
+                .order_by(GroupStationProgress.completed_at.desc())
+                .limit(5)
+            )
+            progress_records = (await session.execute(progress_stmt)).scalars().all()
 
-                # Recent History: Last 5 steals
-                steal_stmt = (
-                    select(StealRecord)
-                    .options(
-                        selectinload(StealRecord.stealer_group),
-                        selectinload(StealRecord.target_group)
-                    )
-                    .order_by(StealRecord.created_at.desc())
-                    .limit(5)
+            # Recent History: Last 5 steals
+            steal_stmt = (
+                select(StealRecord)
+                .options(
+                    selectinload(StealRecord.stealer_group),
+                    selectinload(StealRecord.target_group)
                 )
-                steal_records = (await session.execute(steal_stmt)).scalars().all()
+                .order_by(StealRecord.created_at.desc())
+                .limit(5)
+            )
+            steal_records = (await session.execute(steal_stmt)).scalars().all()
 
-                # Compile history events
-                history_events = []
-                for p in progress_records:
-                    history_events.append({
-                        "time": p.completed_at,
-                        "desc": f"Group '{p.group.name if p.group else 'Unknown Group'}' upgraded '{p.station_level.station.name if p.station_level and p.station_level.station else 'Unknown Station'}' to Level {p.station_level.level_number if p.station_level else 0}."
-                    })
-                for s in steal_records:
-                    history_events.append({
-                        "time": s.created_at,
-                        "desc": f"Group '{s.stealer_group.name if s.stealer_group else 'Unknown Group'}' upgraded their Church and stole {int(s.amount)} members from Group '{s.target_group.name if s.target_group else 'Unknown Group'}'."
-                    })
+            # Compile history events
+            history_events = []
+            for p in progress_records:
+                history_events.append({
+                    "time": p.completed_at,
+                    "desc": f"Group '{p.group.name if p.group else 'Unknown Group'}' upgraded '{p.station_level.station.name if p.station_level and p.station_level.station else 'Unknown Station'}' to Level {p.station_level.level_number if p.station_level else 0}."
+                })
+            for s in steal_records:
+                history_events.append({
+                    "time": s.created_at,
+                    "desc": f"Group '{s.stealer_group.name if s.stealer_group else 'Unknown Group'}' upgraded their Church and stole {int(s.amount)} members from Group '{s.target_group.name if s.target_group else 'Unknown Group'}'."
+                })
 
-                # Sort combined history chronologically (oldest to newest)
-                history_events.sort(key=lambda x: x["time"], reverse=True)
-                recent_history = history_events[:5]
-                recent_history.reverse()
-                history_logs = [f"- {item['desc']}" for item in recent_history]
+            # Sort combined history chronologically (oldest to newest)
+            history_events.sort(key=lambda x: x["time"], reverse=True)
+            recent_history = history_events[:5]
+            recent_history.reverse()
+            history_logs = [f"- {item['desc']}" for item in recent_history]
 
-            # 2. Build prompt
-            import random
-            selected_tone = random.choice(["sarcastic", "encouraging", "hype"])
-            prompt = build_news_prompt(event_type, details, standings, history_logs, tone=selected_tone)
+        # 2. Build prompt
+        import random
+        selected_tone = random.choice(["sarcastic", "encouraging", "hype"])
+        prompt = build_news_prompt(event_type, details, standings, history_logs, tone=selected_tone)
 
-            # 4. Generate AI summary
-            news_text = await generate_gemini_news(prompt)
+        # 4. Generate AI summary
+        news_text = await generate_gemini_news(prompt)
 
         # 5. Broadcast to all active chat sessions
         from aiogram import Bot

@@ -34,19 +34,67 @@ async def handle_my_church(message: Message) -> None:
         max_occupancy = game_logic.get_max_occupancy(group.church_level)
         bonus_pct = round((await game_logic.get_group_church_bonus(db, group_id)) * 100)
 
+        # Fetch all stations except "Church Upgrade"
+        from app.models import Station, StationLevel, GroupStationProgress
+        stations_stmt = select(Station).where(Station.name != "Church Upgrade").order_by(Station.sort_order, Station.id)
+        stations = (await db.execute(stations_stmt)).scalars().all()
+
+        # Fetch completed station levels for this group
+        completed_stmt = (
+            select(Station.name, StationLevel.level_number)
+            .join(StationLevel, StationLevel.station_id == Station.id)
+            .join(GroupStationProgress, GroupStationProgress.station_level_id == StationLevel.id)
+            .where(GroupStationProgress.group_id == group_id)
+        )
+        completed_rows = (await db.execute(completed_stmt)).all()
+        
+        # Build mapping of station name -> max level
+        completed_levels_map = {}
+        total_ministry_score = 0
+        for s_name, lv_num in completed_rows:
+            completed_levels_map[s_name] = max(completed_levels_map.get(s_name, 0), lv_num)
+            total_ministry_score += lv_num
+            
+        church_lv = group.church_level or 1
+        total_score = church_lv + total_ministry_score
+
     # Visual progress bar calculation
     percentage = min(1.0, group.population / max_occupancy)
     filled_blocks = round(percentage * 10)
     bar = f"[{'█' * filled_blocks}{'░' * (10 - filled_blocks)}]"
+
+    # Emojis for each ministry
+    MINISTRY_EMOJIS = {
+        "Social Media": "📱",
+        "Worship Team": "🎸",
+        "Sound Crew": "🎚️",
+        "Powerpoint Team": "💻",
+        "Preachers": "📣",
+        "Welcome Team / Ushers": "🤝",
+        "Children Ministry": "👶",
+        "Finance": "💰",
+    }
+
+    ministry_lines = []
+    for s in stations:
+        emoji = MINISTRY_EMOJIS.get(s.name, "🛠️")
+        lv = completed_levels_map.get(s.name, 0)
+        ministry_lines.append(f"  {emoji} *{s.name}:* Level {lv}")
 
     # Dashboard formatting
     lines = [
         f"⛪ *{group.name} — Church Dashboard*",
         f"━━━━━━━━━━━━━━━━━━━",
         f"🏛️ *Church Tier:* {tier_name} (Level {group.church_level})",
+        f"👥 *Occupancy:* {bar} *{int(group.population):,}/{max_occupancy:,}*",
         f"📈 *Station Earning Bonus:* `+{bonus_pct}%`",
         f"",
-        f"👥 *Occupancy:* {bar} *{int(group.population):,}/{max_occupancy:,}*",
+        f"🛡️ *Total Development Score:* **{total_score}**",
+        f"_(Church Level + sum of completed ministry levels)_",
+        f"",
+        f"🛠️ *Ministry Status:*",
+    ] + ministry_lines + [
+        f"━━━━━━━━━━━━━━━━━━━"
     ]
 
     if group.population >= max_occupancy:
