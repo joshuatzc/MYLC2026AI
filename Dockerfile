@@ -19,6 +19,7 @@ COPY --from=builder /install /usr/local
 # Copy application source
 COPY app/ ./app/
 COPY scripts/ ./scripts/
+COPY assets/ ./assets/
 
 # Data directory for persistent SQLite database (mount a volume here)
 RUN mkdir -p /data

@@ -710,14 +710,11 @@ async def cb_admin_church_hint_buy(callback: CallbackQuery) -> None:
     photo_filename = result.get("hint_photo")
     photo_path = None
     if photo_filename:
-        possible_paths = [
-            os.path.join("assets", "hints", photo_filename),
-            os.path.join("app", "assets", "hints", photo_filename),
-        ]
-        for path in possible_paths:
-            if os.path.exists(path):
-                photo_path = path
-                break
+        _here = os.path.dirname(os.path.abspath(__file__))
+        _project_root = os.path.abspath(os.path.join(_here, "..", "..", ".."))
+        candidate = os.path.join(_project_root, "assets", "hints", photo_filename)
+        if os.path.exists(candidate):
+            photo_path = candidate
 
     if photo_path:
         photo = FSInputFile(photo_path)

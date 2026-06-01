@@ -145,18 +145,15 @@ async def cb_view_hints_nav(callback: CallbackQuery) -> None:
         hint_text = hint_data.get("text", "No hint available.")
         photo_filename = hint_data.get("photo")
 
-    # Resolve photo path
+    # Resolve photo path – anchor to project root (handlers/ -> bot/ -> app/ -> project root)
     import os
     photo_path = None
     if photo_filename:
-        possible_paths = [
-            os.path.join("assets", "hints", photo_filename),
-            os.path.join("app", "assets", "hints", photo_filename),
-        ]
-        for path in possible_paths:
-            if os.path.exists(path):
-                photo_path = path
-                break
+        _here = os.path.dirname(os.path.abspath(__file__))
+        _project_root = os.path.abspath(os.path.join(_here, "..", "..", ".."))
+        candidate = os.path.join(_project_root, "assets", "hints", photo_filename)
+        if os.path.exists(candidate):
+            photo_path = candidate
 
     # Build navigation keyboard
     keyboard = hint_carousel_keyboard(level_id, current_idx, total_hints)
