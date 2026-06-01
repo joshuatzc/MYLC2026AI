@@ -330,13 +330,29 @@ async def start_super_pastor_event(
     else:
         claims_row.value_str = ""
 
+    # Store started at time and duration
+    started_res = await db.execute(select(GlobalState).where(GlobalState.key == "super_pastor_started_at"))
+    started_row = started_res.scalar_one_or_none()
+    if not started_row:
+        db.add(GlobalState(key="super_pastor_started_at", value_str=datetime.utcnow().isoformat()))
+    else:
+        started_row.value_str = datetime.utcnow().isoformat()
+
+    dur_res = await db.execute(select(GlobalState).where(GlobalState.key == "super_pastor_duration"))
+    dur_row = dur_res.scalar_one_or_none()
+    if not dur_row:
+        db.add(GlobalState(key="super_pastor_duration", value_int=20))
+    else:
+        dur_row.value_int = 20
+
     await db.commit()
 
     # Trigger AI announcement broadcast + auto-expire timer
     from app.services.ai_news import trigger_event_broadcast
     from app.services.timed_events import super_pastor_expire_timer
     asyncio.create_task(trigger_event_broadcast("super_pastor_start", {
-        "reward_amount": body.reward_amount
+        "reward_amount": body.reward_amount,
+        "duration_minutes": 20
     }))
     asyncio.create_task(super_pastor_expire_timer(20))
 
@@ -446,6 +462,7 @@ async def start_infestation_event(
         ("infestation_penalty",  None,         body.penalty, None),
         ("infestation_cutoff",   None,         body.cutoff,  None),
         ("infestation_duration", None,         body.duration_minutes, None),
+        ("infestation_started_at", None,       None,         datetime.utcnow().isoformat()),
     ]:
         row = (await db.execute(select(GlobalState).where(GlobalState.key == key))).scalar_one_or_none()
         if not row:
@@ -460,7 +477,11 @@ async def start_infestation_event(
 
     from app.services.ai_news import trigger_event_broadcast
     from app.services.timed_events import infestation_audit_timer
-    asyncio.create_task(trigger_event_broadcast("infestation_start", {"penalty": body.penalty, "cutoff": body.cutoff}))
+    asyncio.create_task(trigger_event_broadcast("infestation_start", {
+        "penalty": body.penalty,
+        "cutoff": body.cutoff,
+        "duration_minutes": body.duration_minutes
+    }))
     asyncio.create_task(infestation_audit_timer(body.duration_minutes, body.cutoff, body.penalty))
 
     return {
@@ -570,7 +591,7 @@ async def start_corruption_event(
 
     from app.services.ai_news import trigger_event_broadcast
     from app.services.timed_events import corruption_expire_timer
-    asyncio.create_task(trigger_event_broadcast("corruption_start", {}))
+    asyncio.create_task(trigger_event_broadcast("corruption_start", {"duration_minutes": body.duration_minutes}))
     asyncio.create_task(corruption_expire_timer(body.duration_minutes, total_questions))
 
     return {

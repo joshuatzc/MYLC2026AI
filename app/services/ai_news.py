@@ -8,6 +8,7 @@ broadcasts them directly to all active Telegram chat sessions in the background.
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime
 import logging
 import aiohttp
 from sqlalchemy import select
@@ -197,6 +198,201 @@ def build_news_prompt(event_type: str, details: dict, standings: list[str], hist
     return prompt
 
 
+from aiogram.exceptions import TelegramRetryAfter, TelegramAPIError
+from aiogram.types import Message
+
+async def safe_send_message(bot: Bot, chat_id: str, text: str) -> Message | None:
+    """Sends a Telegram message, catching and retrying on rate limits (429) up to 3 times."""
+    for attempt in range(3):
+        try:
+            return await bot.send_message(chat_id=chat_id, text=text)
+        except TelegramRetryAfter as e:
+            logger.warning("Rate limit hit in safe_send_message for chat %s. Sleeping for %s seconds...", chat_id, e.retry_after)
+            await asyncio.sleep(e.retry_after)
+        except TelegramAPIError as e:
+            logger.warning("Telegram API error in safe_send_message for chat %s: %s", chat_id, e)
+            break
+        except Exception as e:
+            logger.warning("Unexpected error in safe_send_message for chat %s: %s", chat_id, e)
+            break
+    return None
+
+
+async def safe_edit_message_text(bot: Bot, chat_id: str, message_id: int, text: str) -> bool:
+    """Edits a Telegram message, catching and retrying on rate limits (429) up to 3 times."""
+    for attempt in range(3):
+        try:
+            await bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=text)
+            return True
+        except TelegramRetryAfter as e:
+            logger.warning("Rate limit hit in safe_edit_message_text for chat %s. Sleeping for %s seconds...", chat_id, e.retry_after)
+            await asyncio.sleep(e.retry_after)
+        except TelegramAPIError as e:
+            if "message is not modified" in str(e):
+                return True
+            logger.warning("Telegram API error in safe_edit_message_text for chat %s: %s", chat_id, e)
+            break
+        except Exception as e:
+            logger.warning("Unexpected error in safe_edit_message_text for chat %s: %s", chat_id, e)
+            break
+    return False
+
+
+def build_emergency_message(event_type: str, details: dict, remaining_minutes: int) -> str:
+    """Formats the emergency broadcast message text with a live countdown timer."""
+    header = "📻 <b>THE MYLC TIMES</b> 🚨 EMERGENCY REPORT\n\n"
+    if remaining_minutes <= 0:
+        timer_str = "⏱️ <b>Time Remaining:</b> 🔴 <b>Event Ended</b>"
+    else:
+        timer_str = f"⏱️ <b>Time Remaining:</b> ⏳ <b>{remaining_minutes}m</b> remaining"
+
+    if event_type == "super_pastor_start":
+        return (
+            f"{header}🌟 <b>THE SUPER PASTOR HAS ARRIVED!</b> 🏃‍♂️💨\n\n"
+            f"A legendary Super Pastor is roaming the venue! Your mission is to find <b>Rev Bernard</b> immediately and bring him the following items IRL:\n"
+            f"⏱️ A stopwatch stopped at <b>exactly 3s and 16ms</b>\n"
+            f"🔋 A <b>power bank</b>\n"
+            f"🧻 A roll of <b>toilet paper</b>\n\n"
+            f"The <b>first 3 groups</b> to present these items to him will get the full bonus reward of {details.get('reward_amount', 1000)} members! 🏆\n\n"
+            f"⚠️ <b>Rules:</b>\n"
+            f"1. You must show the items to him first.\n"
+            f"2. Only after verification, tap <b>🌟 Claim Super Pastor</b> in your <b>🔑 Admin Section</b>.\n"
+            f"3. Once 3 groups claim, or the timer expires, the window closes. Make haste!\n\n"
+            f"{timer_str}"
+        )
+    elif event_type == "infestation_start":
+        return (
+            f"{header}URGENT: A rare breed of church-eating termites has been spotted in the area! 🐛⏰\n\n"
+            f"Sources say they specifically target small, underdeveloped churches with weak ministry foundations.\n\n"
+            f"They are expected to strike soon. Any church that hasn't strengthened their ministries to a total score cutoff of <b>{details.get('cutoff', 0)}</b> could lose up to {details.get('penalty', 300)} congregation members!\n\n"
+            f"{timer_str}"
+        )
+    elif event_type == "corruption_start":
+        return (
+            f"{header}BREAKING: The Church Authority has launched an emergency legitimacy investigation! 📜⏰\n\n"
+            f"Hearsay has it that some churches have been run by completely clueless leaders. All church leaders must prove their legitimacy NOW in the Admin Section.\n\n"
+            f"Every right answer grows your congregation (+15%), every wrong one shrinks it (-5%). If you do not complete the quiz in time, you lose -5% per unanswered question!\n\n"
+            f"{timer_str}"
+        )
+    return ""
+
+
+async def handle_emergency_broadcast_lifecycle(event_type: str, details: dict) -> None:
+    """
+    Sends the initial emergency broadcast to all active chats, and then
+    spawns a background loop that updates the message every 1 minute with
+    the remaining time until the event becomes inactive.
+    """
+    from app.models import GlobalState
+    from aiogram import Bot
+    from aiogram.client.default import DefaultBotProperties
+    from aiogram.enums import ParseMode
+
+    bot = Bot(token=settings.TELEGRAM_BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+    sent_messages: dict[str, int] = {}  # chat_id -> message_id
+
+    try:
+        # Determine starting duration in minutes
+        duration_minutes = details.get("duration_minutes", 20)
+
+        # Construct initial message text
+        news_text = build_emergency_message(event_type, details, duration_minutes)
+
+        # Fetch all active chats
+        async with AsyncSessionLocal() as session:
+            chat_ids_stmt = select(ChatState.chat_id)
+            chat_ids = (await session.execute(chat_ids_stmt)).scalars().all()
+
+        if not chat_ids:
+            logger.info("No active chat sessions found to send emergency broadcast.")
+            return
+
+        logger.info("Sending initial emergency broadcast to %d chat sessions...", len(chat_ids))
+        for chat_id in chat_ids:
+            try:
+                msg = await safe_send_message(bot, chat_id, news_text)
+                if msg:
+                    sent_messages[chat_id] = msg.message_id
+                await asyncio.sleep(0.08)
+            except Exception as chat_exc:
+                logger.warning("Failed to send initial emergency broadcast to chat %s: %s", chat_id, chat_exc)
+
+        if not sent_messages:
+            logger.warning("No emergency broadcast messages were successfully sent.")
+            return
+
+        # Determine the database keys based on event_type
+        if event_type == "super_pastor_start":
+            active_key = "super_pastor_active"
+            started_at_key = "super_pastor_started_at"
+            duration_key = "super_pastor_duration"
+        elif event_type == "infestation_start":
+            active_key = "infestation_active"
+            started_at_key = "infestation_started_at"
+            duration_key = "infestation_duration"
+        else:  # corruption_start
+            active_key = "corruption_active"
+            started_at_key = "corruption_started_at"
+            duration_key = "corruption_duration"
+
+        # Loop until event is inactive or expired
+        while True:
+            await asyncio.sleep(60)
+
+            async with AsyncSessionLocal() as session:
+                # Check if event is still active in database
+                active_row = (await session.execute(
+                    select(GlobalState).where(GlobalState.key == active_key)
+                )).scalar_one_or_none()
+
+                if not active_row or not active_row.value_bool:
+                    logger.info("Event %s is no longer active. Exiting lifecycle loop.", event_type)
+                    break
+
+                # Calculate remaining time
+                started_row = (await session.execute(
+                    select(GlobalState).where(GlobalState.key == started_at_key)
+                )).scalar_one_or_none()
+
+                dur_row = (await session.execute(
+                    select(GlobalState).where(GlobalState.key == duration_key)
+                )).scalar_one_or_none()
+
+                elapsed = 0.0
+                if started_row and started_row.value_str:
+                    try:
+                        start_time = datetime.fromisoformat(started_row.value_str)
+                        elapsed = (datetime.utcnow() - start_time).total_seconds()
+                    except Exception:
+                        pass
+
+                total_dur = dur_row.value_int if dur_row else duration_minutes
+                remaining_seconds = (total_dur * 60) - elapsed
+
+                if remaining_seconds <= 0:
+                    logger.info("Timer expired for %s. Exiting lifecycle loop.", event_type)
+                    break
+
+                remaining_minutes = int(max(1, round(remaining_seconds / 60.0)))
+
+            # Update messages with the current remaining minutes
+            updated_text = build_emergency_message(event_type, details, remaining_minutes)
+            for chat_id, message_id in sent_messages.items():
+                await safe_edit_message_text(bot, chat_id, message_id, updated_text)
+                await asyncio.sleep(0.08)
+
+        # When the loop terminates, update all messages to show "Event Ended"
+        ended_text = build_emergency_message(event_type, details, 0)
+        for chat_id, message_id in sent_messages.items():
+            await safe_edit_message_text(bot, chat_id, message_id, ended_text)
+            await asyncio.sleep(0.08)
+
+    except Exception as e:
+        logger.exception("Error in emergency broadcast lifecycle loop: %s", e)
+    finally:
+        await bot.session.close()
+
+
 async def trigger_event_broadcast(event_type: str, details: dict) -> None:
     """
     Triggers an immediate, event-driven AI news broadcast based on a game or admin action.
@@ -212,34 +408,10 @@ async def trigger_event_broadcast(event_type: str, details: dict) -> None:
         }
 
         if event_type in hardcoded_event_starts:
-            header = "📻 <b>THE MYLC TIMES</b> 🚨 EMERGENCY REPORT\n\n"
-            if event_type == "super_pastor_start":
-                news_text = (
-                    f"{header}🌟 <b>THE SUPER PASTOR HAS ARRIVED!</b> 🏃‍♂️💨\n\n"
-                    f"A legendary Super Pastor is roaming the venue! Your mission is to find <b>Rev Bernard</b> immediately and bring him the following items IRL:\n"
-                    f"⏱️ A stopwatch stopped at <b>exactly 3s and 16ms</b>\n"
-                    f"🔋 A <b>power bank</b>\n"
-                    f"🧻 A roll of <b>toilet paper</b>\n\n"
-                    f"The <b>first 3 groups</b> to present these items to him will get the full bonus reward of {details.get('reward_amount', 1000)} members! 🏆\n\n"
-                    f"⚠️ <b>Rules:</b>\n"
-                    f"1. You must show the items to him first.\n"
-                    f"2. Only after verification, tap <b>🌟 Claim Super Pastor</b> in your <b>🔑 Admin Section</b>.\n"
-                    f"3. Once 3 groups claim, or after <b>20 minutes</b>, the window closes. Make haste!"
-                )
-            elif event_type == "infestation_start":
-                news_text = (
-                    f"{header}URGENT: A rare breed of church-eating termites has been spotted in the area! 🐛⏰\n\n"
-                    f"Sources say they specifically target small, underdeveloped churches with weak ministry foundations.\n\n"
-                    f"They are expected to strike within 20 minutes. Any church that hasn't strengthened their ministries to a total score cutoff of <b>{details.get('cutoff', 0)}</b> could lose up to {details.get('penalty', 300)} congregation members!"
-                )
-            elif event_type == "corruption_start":
-                news_text = (
-                    f"{header}BREAKING: The Church Authority has launched an emergency legitimacy investigation! 📜⏰\n\n"
-                    f"Hearsay has it that some churches have been run by completely clueless leaders. All church leaders must prove their legitimacy NOW in the Admin Section.\n\n"
-                    f"You have 20 minutes. Every right answer grows your congregation (+15%), every wrong one shrinks it (-5%). If you do not complete the quiz in time, you lose -5% per unanswered question!"
-                )
-        else:
-            # 1. Fetch current standings and recent history
+            asyncio.create_task(handle_emergency_broadcast_lifecycle(event_type, details))
+            return
+
+        # 1. Fetch current standings and recent history
             standings = []
             history_logs = []
             async with AsyncSessionLocal() as session:
@@ -322,7 +494,7 @@ async def trigger_event_broadcast(event_type: str, details: dict) -> None:
             for chat_id in chat_ids:
                 try:
                     await bot.send_message(chat_id=chat_id, text=news_text)
-                    await asyncio.sleep(0.05)
+                    await asyncio.sleep(0.08)
                 except Exception as chat_exc:
                     logger.warning("Failed to send broadcast message to chat %s: %s", chat_id, chat_exc)
         finally:

@@ -803,7 +803,7 @@ async def check_and_broadcast_upgrade_eligibility(
             for chat_id in chat_ids:
                 try:
                     await bot.send_message(chat_id=chat_id, text=message_text)
-                    await asyncio.sleep(0.05)
+                    await asyncio.sleep(0.08)
                 except Exception as e:
                     import logging
                     logging.getLogger(__name__).warning("Failed to send eligibility broadcast to %s: %s", chat_id, e)
