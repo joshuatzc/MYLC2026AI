@@ -759,15 +759,51 @@ async def cb_claim_super_pastor(callback: CallbackQuery) -> None:
             await _show_admin_eligible(callback.message, chat_id, edit=True)
             return
 
-        # Fetch reward
-        sp_reward_res = await db.execute(select(GlobalState).where(GlobalState.key == "super_pastor_reward"))
-        sp_reward_row = sp_reward_res.scalar_one_or_none()
-        reward_amount = sp_reward_row.value_int if sp_reward_row else 1000
+        # Validate duplicate claims
+        claims_res = await db.execute(select(GlobalState).where(GlobalState.key == "super_pastor_claims"))
+        claims_row = claims_res.scalar_one_or_none()
+        claims_str = claims_row.value_str if claims_row else ""
+        claims_list = [int(x) for x in claims_str.split(",") if x.strip()]
 
-        # Claim: disable the event immediately
-        sp_active_row.value_bool = False
-        
-        # Set claimed_by
+        if group_id in claims_list:
+            await callback.answer("⚠️ Your group has already claimed this event! Allow other groups a chance!", show_alert=True)
+            return
+
+        # Check claim count limit
+        claim_count_res = await db.execute(select(GlobalState).where(GlobalState.key == "super_pastor_claim_count"))
+        claim_count_row = claim_count_res.scalar_one_or_none()
+        claim_count = claim_count_row.value_int if claim_count_row else 0
+
+        if claim_count >= 3:
+            # Mark inactive just in case it wasn't already
+            sp_active_row.value_bool = False
+            await db.commit()
+            await callback.answer("⚠️ The Super Pastor event has already closed (all 3 spots claimed)!", show_alert=True)
+            await _show_admin_eligible(callback.message, chat_id, edit=True)
+            return
+
+        # Increment claim count
+        new_claim_count = claim_count + 1
+        if not claim_count_row:
+            claim_count_row = GlobalState(key="super_pastor_claim_count", value_int=new_claim_count)
+            db.add(claim_count_row)
+        else:
+            claim_count_row.value_int = new_claim_count
+
+        # Append group ID to claims
+        if claims_list:
+            claims_list.append(group_id)
+            new_claims_str = ",".join(str(x) for x in claims_list)
+        else:
+            new_claims_str = str(group_id)
+
+        if not claims_row:
+            claims_row = GlobalState(key="super_pastor_claims", value_str=new_claims_str)
+            db.add(claims_row)
+        else:
+            claims_row.value_str = new_claims_str
+
+        # Update last claimed_by for backward compatibility
         claimed_by_res = await db.execute(select(GlobalState).where(GlobalState.key == "super_pastor_claimed_by"))
         claimed_by_row = claimed_by_res.scalar_one_or_none()
         if not claimed_by_row:
@@ -775,7 +811,16 @@ async def cb_claim_super_pastor(callback: CallbackQuery) -> None:
             db.add(claimed_by_row)
         else:
             claimed_by_row.value_int = group_id
-        
+
+        # Close the event if we hit 3 claims
+        if new_claim_count >= 3:
+            sp_active_row.value_bool = False
+
+        # Fetch reward
+        sp_reward_res = await db.execute(select(GlobalState).where(GlobalState.key == "super_pastor_reward"))
+        sp_reward_row = sp_reward_res.scalar_one_or_none()
+        reward_amount = sp_reward_row.value_int if sp_reward_row else 1000
+
         # Give reward to group
         group_res = await db.execute(select(Group).where(Group.id == group_id))
         group = group_res.scalar_one_or_none()
@@ -800,14 +845,21 @@ async def cb_claim_super_pastor(callback: CallbackQuery) -> None:
         "reward_amount": reward_amount,
         "old_population": old_pop,
         "new_population": new_pop,
+        "spot_number": new_claim_count,
+        "remaining_spots": 3 - new_claim_count,
     }))
 
     text = (
         f"🎉 *Super Pastor Claimed Successfully!* 🏆\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
-        f"Congratulations! Your group *{group.name}* claimed the Super Pastor first! 🏃‍♂️💨\n\n"
-        f"👥 Population: *{int(old_pop):,}* → *{int(new_pop):,}* (+{reward_amount} members)!"
+        f"Congratulations! Your group *{group.name}* claimed spot #{new_claim_count}! 🏃‍♂️💨\n\n"
+        f"👥 Population: *{int(old_pop):,}* → *{int(new_pop):,}* (+{reward_amount} members)!\n"
     )
+    if 3 - new_claim_count > 0:
+        text += f"📢 Only *{3 - new_claim_count}* spot(s) remaining!"
+    else:
+        text += f"🚫 All 3 spots have been swooped! The event is now officially closed."
+        
     if new_pop == max_occ and old_pop + reward_amount > max_occ:
         text += "\n\n⚠️ *WARNING:* Population capped at max occupancy!"
 

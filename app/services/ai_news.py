@@ -141,13 +141,20 @@ def build_news_prompt(event_type: str, details: dict, standings: list[str], hist
             f"A brand new group named '{details['group_name']}' has officially entered the church-building race with an initial population of {int(details['population'])}!"
         )
     elif event_type == "super_pastor_claim":
+        spot_number = details.get("spot_number", 1)
+        remaining = details.get("remaining_spots", 0)
         event_desc = (
-            f"The Super Pastor has been claimed! Group '{details['group_name']}' successfully brought the items to him IRL and claimed the reward first! "
-            f"Their population jumped: {int(details['old_population'])} -> {int(details['new_population'])} (+{details['reward_amount']} members). The event is now officially over!"
+            f"A spot has been swooped! Group '{details['group_name']}' successfully found Rev Bernard "
+            f"and presented him with a stopwatch stopped at exactly 3s and 16ms, a power bank, and toilet paper, securing spot #{spot_number}! "
+            f"Their population jumped: {int(details['old_population'])} -> {int(details['new_population'])} (+{details['reward_amount']} members)."
         )
+        if remaining > 0:
+            event_desc += f" Only {remaining} spot(s) are remaining before the event closes!"
+        else:
+            event_desc += " All 3 spots have been taken, and the Super Pastor emergency event is officially closed!"
     elif event_type == "super_pastor_expired":
         event_desc = (
-            "BREAKING: The Super Pastor has packed up and left the building — and nobody claimed him! "
+            "BREAKING: The Super Pastor has packed up and left the building — and the remaining slots are gone! "
             "The reward window has officially closed. Better luck next time, churches! 😔"
         )
     elif event_type == "infestation_result":
@@ -208,9 +215,16 @@ async def trigger_event_broadcast(event_type: str, details: dict) -> None:
             header = "📻 <b>THE MYLC TIMES</b> 🚨 EMERGENCY REPORT\n\n"
             if event_type == "super_pastor_start":
                 news_text = (
-                    f"{header}A legendary Super Pastor is now roaming around the venue!\n\n"
-                    f"Leaders, find him and present the required items IRL. The FIRST group to claim him via the Claim button in their Admin Section gets a huge reward of {details.get('reward_amount', 1000)} members! 🏃‍♂️💨\n\n"
-                    f"Remember, you must bring the goods to him first. Only then can you claim the reward!"
+                    f"{header}🌟 <b>THE SUPER PASTOR HAS ARRIVED!</b> 🏃‍♂️💨\n\n"
+                    f"A legendary Super Pastor is roaming the venue! Your mission is to find <b>Rev Bernard</b> immediately and bring him the following items IRL:\n"
+                    f"⏱️ A stopwatch stopped at <b>exactly 3s and 16ms</b>\n"
+                    f"🔋 A <b>power bank</b>\n"
+                    f"🧻 A roll of <b>toilet paper</b>\n\n"
+                    f"The <b>first 3 groups</b> to present these items to him will get the full bonus reward of {details.get('reward_amount', 1000)} members! 🏆\n\n"
+                    f"⚠️ <b>Rules:</b>\n"
+                    f"1. You must show the items to him first.\n"
+                    f"2. Only after verification, tap <b>🌟 Claim Super Pastor</b> in your <b>🔑 Admin Section</b>.\n"
+                    f"3. Once 3 groups claim, or after <b>20 minutes</b>, the window closes. Make haste!"
                 )
             elif event_type == "infestation_start":
                 news_text = (

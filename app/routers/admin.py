@@ -312,6 +312,24 @@ async def start_super_pastor_event(
     else:
         claimed_by_row.value_int = None
 
+    # Reset claim_count
+    claim_count_res = await db.execute(select(GlobalState).where(GlobalState.key == "super_pastor_claim_count"))
+    claim_count_row = claim_count_res.scalar_one_or_none()
+    if not claim_count_row:
+        claim_count_row = GlobalState(key="super_pastor_claim_count", value_int=0)
+        db.add(claim_count_row)
+    else:
+        claim_count_row.value_int = 0
+
+    # Reset claims
+    claims_res = await db.execute(select(GlobalState).where(GlobalState.key == "super_pastor_claims"))
+    claims_row = claims_res.scalar_one_or_none()
+    if not claims_row:
+        claims_row = GlobalState(key="super_pastor_claims", value_str="")
+        db.add(claims_row)
+    else:
+        claims_row.value_str = ""
+
     await db.commit()
 
     # Trigger AI announcement broadcast + auto-expire timer
@@ -370,11 +388,31 @@ async def super_pastor_event_status(
         group_res = await db.execute(select(Group.name).where(Group.id == claimed_by_id))
         claimed_by_name = group_res.scalar_one_or_none()
 
+    claim_count_res = await db.execute(select(GlobalState).where(GlobalState.key == "super_pastor_claim_count"))
+    claim_count_row = claim_count_res.scalar_one_or_none()
+    claim_count = claim_count_row.value_int if claim_count_row else 0
+
+    claims_res = await db.execute(select(GlobalState).where(GlobalState.key == "super_pastor_claims"))
+    claims_row = claims_res.scalar_one_or_none()
+    claims_str = claims_row.value_str if claims_row else ""
+    claims_list = [int(x) for x in claims_str.split(",") if x.strip()]
+
+    claimed_group_names = []
+    if claims_list:
+        for gid in claims_list:
+            g_res = await db.execute(select(Group.name).where(Group.id == gid))
+            name = g_res.scalar_one_or_none()
+            if name:
+                claimed_group_names.append(name)
+
     return {
         "active": active,
         "reward_amount": reward,
         "claimed_by_id": claimed_by_id,
-        "claimed_by_name": claimed_by_name
+        "claimed_by_name": claimed_by_name,
+        "claim_count": claim_count,
+        "claims": claims_list,
+        "claimed_group_names": claimed_group_names
     }
 
 

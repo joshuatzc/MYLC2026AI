@@ -259,18 +259,20 @@ async def seed(db: AsyncSession) -> None:
     # Global state settings
     # ------------------------------------------------------------------
     from app.models import GlobalState
-    for key, val_bool, val_int in [
-        ("super_pastor_active", False, None),
-        ("super_pastor_reward", None, 1000),
-        ("super_pastor_claimed_by", None, None),
-        ("infestation_active", False, None),
-        ("corruption_active", False, None),
-        ("corruption_duration", None, None),
-        ("corruption_started_at", None, None),
+    for key, val_bool, val_int, val_str in [
+        ("super_pastor_active", False, None, None),
+        ("super_pastor_reward", None, 1000, None),
+        ("super_pastor_claimed_by", None, None, None),
+        ("super_pastor_claim_count", None, 0, None),
+        ("super_pastor_claims", None, None, ""),
+        ("infestation_active", False, None, None),
+        ("corruption_active", False, None, None),
+        ("corruption_duration", None, None, None),
+        ("corruption_started_at", None, None, None),
     ]:
         res = await db.execute(select(GlobalState).where(GlobalState.key == key))
         if not res.scalar_one_or_none():
-            db.add(GlobalState(key=key, value_bool=val_bool, value_int=val_int))
+            db.add(GlobalState(key=key, value_bool=val_bool, value_int=val_int, value_str=val_str))
 
 
     await db.commit()
