@@ -239,7 +239,7 @@ async def safe_edit_message_text(bot: Bot, chat_id: str, message_id: int, text: 
 
 def build_emergency_message(event_type: str, details: dict, remaining_minutes: int) -> str:
     """Formats the emergency broadcast message text with a live countdown timer progress bar."""
-    header = "📻 <b>THE MYLC TIMES</b> 🚨 EMERGENCY REPORT\n\n"
+    header = "📻 <b>THE MYLC TIMES 🚨 EMERGENCY REPORT</b>\n\n"
     
     # Calculate visual timer progress bar
     duration_minutes = details.get("duration_minutes", 20)
@@ -270,9 +270,9 @@ def build_emergency_message(event_type: str, details: dict, remaining_minutes: i
         return (
             f"{header}URGENT: A rare breed of church-eating termites has been spotted in the area! 🐛⏰\n\n"
             f"Sources say they specifically target small, underdeveloped churches with weak ministry foundations.\n\n"
-            f"They are expected to strike soon. Any church that hasn't strengthened their ministries to a **total development score** cutoff of <b>{details.get('cutoff', 0)}</b> could lose up to {details.get('penalty', 300)} congregation members!\n\n"
+            f"They are expected to strike soon. Any church that hasn't strengthened their ministries to a <b>total development score</b> cutoff of <b>{details.get('cutoff', 0)}</b> could lose up to {details.get('penalty', 300)} congregation members!\n\n"
             f"ℹ️ <b>What is your Total Development Score?</b>\n"
-            f"It is the sum of your **Church Level** + **all completed Ministry Levels** (e.g. Social Media, Worship, Sound, etc.).\n"
+            f"It is the sum of your <b>Church Level</b> + <b>all completed Ministry Levels</b> (e.g. Social Media, Worship, Sound, etc.).\n\n"
             f"👉 You can check your group's current score and individual ministry levels inside your <b>⛪ My Church</b> tab on the keyboard!\n\n"
             f"{timer_str}"
         )
