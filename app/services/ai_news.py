@@ -117,7 +117,7 @@ def build_news_prompt(event_type: str, details: dict, standings: list[str], hist
         "   - Section 1 (Title): Strictly output '📻 <b>THE MYLC TIMES</b>'\n"
         "   - Section 2 (Actual Event): Summarize what just happened in exactly one short, punchy sentence.\n"
         "   - Section 3 (Implications / Commentary): Discuss the leaderboard impact or rivalries in exactly one short, witty sentence.\n"
-        "2. Do NOT use markdown asterisks (**) for bolding. Use HTML bold tags (<b>...</b>) for any bolding to ensure Telegram parses it correctly.\n"
+        "2. Do NOT use markdown asterisks (**) for bolding. Use HTML bold tags (<b>...</b>) for any bolding. Ensure every single opening <b> tag has a matching closing </b> tag—do NOT leave any tags unclosed.\n"
         "3. Keep the total message under 40 words."
     )
 
@@ -508,8 +508,20 @@ async def trigger_event_broadcast(event_type: str, details: dict) -> None:
                 try:
                     await bot.send_message(chat_id=chat_id, text=news_text)
                     await asyncio.sleep(0.08)
+                except TelegramAPIError as tg_exc:
+                    if "can't parse entities" in str(tg_exc).lower():
+                        logger.warning("HTML parsing failed for chat %s. Falling back to plain text. Error: %s", chat_id, tg_exc)
+                        import re
+                        plain_text = re.sub(r'<[^>]+>', '', news_text)
+                        try:
+                            await bot.send_message(chat_id=chat_id, text=plain_text, parse_mode=None)
+                            await asyncio.sleep(0.08)
+                        except Exception as fallback_exc:
+                            logger.error("Fallback send failed for chat %s: %s", chat_id, fallback_exc)
+                    else:
+                        logger.warning("Failed to send broadcast message to chat %s: %s", chat_id, tg_exc)
                 except Exception as chat_exc:
-                    logger.warning("Failed to send broadcast message to chat %s: %s", chat_id, chat_exc)
+                    logger.warning("Unexpected error sending broadcast to chat %s: %s", chat_id, chat_exc)
         finally:
             await bot.session.close()
 
