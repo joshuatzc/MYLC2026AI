@@ -115,10 +115,10 @@ def build_news_prompt(event_type: str, details: dict, standings: list[str], hist
         "Formatting Rules:\n"
         "1. Write the message in exactly three sections separated by single blank lines (two newlines):\n"
         "   - Section 1 (Title): Strictly output '📻 <b>THE MYLC TIMES</b>'\n"
-        "   - Section 2 (Actual Event): Summarize what just happened in a realistic, witty style with a fresh, engaging opening hook.\n"
-        "   - Section 3 (Implications / Commentary): Discuss the leaderboard standings, group progress, or other groups' reactions based on the MANDATORY IMPLICATIONS TONE RULE.\n"
+        "   - Section 2 (Actual Event): Summarize what just happened in exactly one short, punchy sentence.\n"
+        "   - Section 3 (Implications / Commentary): Discuss the leaderboard impact or rivalries in exactly one short, witty sentence.\n"
         "2. Do NOT use markdown asterisks (**) for bolding. Use HTML bold tags (<b>...</b>) for any bolding to ensure Telegram parses it correctly.\n"
-        "3. Keep the total message under 30 words."
+        "3. Keep the total message under 40 words."
     )
 
     event_desc = ""
