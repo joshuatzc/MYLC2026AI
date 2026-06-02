@@ -112,8 +112,8 @@ def build_news_prompt(event_type: str, details: dict, standings: list[str], hist
         "Formatting Rules:\n"
         "1. Write the message in exactly three sections separated by single blank lines (two newlines):\n"
         "   - Section 1 (Title): Strictly output '📻 <b>THE MYLC TIMES</b>'\n"
-        "   - Section 2 (Actual Event): Summarize what just happened in exactly one short, punchy sentence. Play around with their group name if possible\n"
-        "   - Section 3 (Implications / Commentary): Discuss the leaderboard impact or rivalries in exactly one short, witty sentence.\n"
+        "   - Section 2 (Actual Event): Summarize what the group achieved, and wordplay around their group name in exactly one short sentence.\n"
+        "   - Section 3 (Implications / Commentary): Discuss the leaderboard impact in less than 10 words.\n"
         "2. Do NOT use markdown asterisks (**) for bolding. Use HTML bold tags (<b>...</b>) for any bolding. Ensure every single opening <b> tag has a matching closing </b> tag—do NOT leave any tags unclosed."
     )
 
