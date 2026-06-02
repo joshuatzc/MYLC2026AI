@@ -394,8 +394,8 @@ async def cb_admin_upgrade_detail(callback: CallbackQuery) -> None:
                 
                 cost_pct = 0
                 if next_hint_num is not None:
-                    base_percentage = 0.10 + (next_hint_num * 0.05)  # 15%, 20%, 25%
-                    cost_pct = round(max(0.01, base_percentage - (N * 0.01)) * 100)
+                    base_percentage = next_hint_num * 0.05  # 5%, 10%, 15%
+                    cost_pct = round(max(0.03, base_percentage - (N * 0.01)) * 100)
                 
                 text = (
                     f"🏛️ *Confirm Church Upgrade* 🏛️\n"

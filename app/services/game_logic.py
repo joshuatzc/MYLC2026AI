@@ -540,8 +540,8 @@ async def buy_church_hint(
     N = completions_res.scalar() or 0
 
     # 5. Calculate discounted cost percentage
-    base_percentage = 0.10 + (hint_number * 0.05)  # 15%, 20%, 25%
-    cost_percentage = max(0.01, base_percentage - (N * 0.01))
+    base_percentage = hint_number * 0.05  # 5%, 10%, 15%
+    cost_percentage = max(0.03, base_percentage - (N * 0.01))
     cost = round(group.population * cost_percentage)
 
     # 6. Validate safety net
