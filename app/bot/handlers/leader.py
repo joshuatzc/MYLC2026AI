@@ -731,11 +731,96 @@ async def cb_admin_church_hint_buy(callback: CallbackQuery) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Claim Super Pastor Handler
+# Claim Super Pastor Handlers (Confirm & Execute)
 # ---------------------------------------------------------------------------
 
 @router.callback_query(F.data == "claim_super_pastor")
 async def cb_claim_super_pastor(callback: CallbackQuery) -> None:
+    chat_id = str(callback.message.chat.id)
+    
+    async with AsyncSessionLocal() as db:
+        group_id = await auth.get_current_group_id(db, chat_id)
+        if group_id is None:
+            await callback.answer("No group selected.", show_alert=True)
+            return
+
+        # Check if active (race condition safety)
+        from app.models import GlobalState, Group
+        sp_active_res = await db.execute(select(GlobalState).where(GlobalState.key == "super_pastor_active"))
+        sp_active_row = sp_active_res.scalar_one_or_none()
+        sp_active = sp_active_row.value_bool if sp_active_row else False
+
+        if not sp_active:
+            await callback.answer("⚠️ This event has already ended or is no longer active!", show_alert=True)
+            # Refresh admin eligible screen to remove button
+            await _show_admin_eligible(callback.message, chat_id, edit=True)
+            return
+
+        # Validate duplicate claims
+        claims_res = await db.execute(select(GlobalState).where(GlobalState.key == "super_pastor_claims"))
+        claims_row = claims_res.scalar_one_or_none()
+        claims_str = claims_row.value_str if claims_row else ""
+        claims_list = [int(x) for x in claims_str.split(",") if x.strip()]
+
+        if group_id in claims_list:
+            await callback.answer("⚠️ Your group has already claimed this event! Allow other groups a chance!", show_alert=True)
+            return
+
+        # Check claim count limit
+        claim_count_res = await db.execute(select(GlobalState).where(GlobalState.key == "super_pastor_claim_count"))
+        claim_count_row = claim_count_res.scalar_one_or_none()
+        claim_count = claim_count_row.value_int if claim_count_row else 0
+
+        if claim_count >= 3:
+            await callback.answer("⚠️ The Super Pastor event has already closed (all 3 spots claimed)!", show_alert=True)
+            await _show_admin_eligible(callback.message, chat_id, edit=True)
+            return
+
+        # Fetch reward
+        sp_reward_res = await db.execute(select(GlobalState).where(GlobalState.key == "super_pastor_reward"))
+        sp_reward_row = sp_reward_res.scalar_one_or_none()
+        reward_amount = sp_reward_row.value_int if sp_reward_row else 1000
+
+        # Fetch group
+        group_res = await db.execute(select(Group).where(Group.id == group_id))
+        group = group_res.scalar_one_or_none()
+        if not group:
+            await callback.answer("Group not found.", show_alert=True)
+            return
+
+        old_pop = group.population
+        max_occ = game_logic.get_max_occupancy(group.church_level)
+        new_pop = min(max_occ, old_pop + reward_amount)
+        capped = (old_pop + reward_amount) > max_occ
+
+    from app.bot.keyboards import super_pastor_confirm_keyboard
+
+    cap_warning = ""
+    if capped:
+        cap_warning = f"\n⚠️ *WARNING:* Your population will be *capped* at your current church limit of **{max_occ:,}** members! Upgrade your church to continue growing.\n"
+
+    text = (
+        f"🌟 *Confirm Super Pastor Claim* 🌟\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"Event: *Super Pastor – Spot Claim*\n\n"
+        f"⚠️ *WARNING:* Make sure you have presented the required items (stopwatch at 3s 16ms, power bank, and toilet paper) to *Rev Bernard* IRL and he has verified them first!\n\n"
+        f"👥 Current Population: **{int(old_pop):,}**\n"
+        f"📈 Population Reward: **+{reward_amount:,}** members\n"
+        f"👥 New population after claim: **{int(new_pop):,}**\n"
+        f"{cap_warning}\n"
+        f"Are you sure you want to confirm this claim?"
+    )
+
+    await callback.message.edit_text(
+        text,
+        parse_mode="Markdown",
+        reply_markup=super_pastor_confirm_keyboard(),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "super_pastor_confirm")
+async def cb_super_pastor_confirm(callback: CallbackQuery) -> None:
     chat_id = str(callback.message.chat.id)
     
     async with AsyncSessionLocal() as db:
@@ -869,4 +954,5 @@ async def cb_claim_super_pastor(callback: CallbackQuery) -> None:
         reply_markup=None,
     )
     await callback.answer("Super Pastor claimed successfully!")
+
 

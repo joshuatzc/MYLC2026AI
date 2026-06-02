@@ -144,7 +144,7 @@ def build_news_prompt(event_type: str, details: dict, standings: list[str], hist
         spot_number = details.get("spot_number", 1)
         remaining = details.get("remaining_spots", 0)
         event_desc = (
-            f"A spot has been swooped! Group '{details['group_name']}' successfully found Rev Bernard "
+            f"A SUPER PASTOR spot has been swooped! Group '{details['group_name']}' successfully found Rev Bernard "
             f"and presented him with a stopwatch stopped at exactly 3s and 16ms, a power bank, and toilet paper, securing spot #{spot_number}! "
             f"Their population jumped: {int(details['old_population'])} -> {int(details['new_population'])} (+{details['reward_amount']} members)."
         )

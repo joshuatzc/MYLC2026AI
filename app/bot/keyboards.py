@@ -187,6 +187,17 @@ def church_confirm_keyboard(
     return builder.as_markup()
 
 
+def super_pastor_confirm_keyboard() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text="✅ Yes, confirm claim",
+        callback_data="super_pastor_confirm",
+    )
+    builder.button(text="❌ Cancel", callback_data="admin_section")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
 def my_church_dashboard_keyboard(level_id: int) -> InlineKeyboardMarkup:
     """Build the button to view unlocked hints for the next level upgrade."""
     builder = InlineKeyboardBuilder()
