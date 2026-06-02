@@ -44,9 +44,6 @@ async def generate_gemini_news(prompt: str) -> str:
         "generationConfig": {
             "temperature": 0.8,
             "maxOutputTokens": 250,
-            "thinkingConfig": {
-                "thinkingLevel": settings.GEMINI_THINKING_LEVEL
-            }
         }
     }
 
