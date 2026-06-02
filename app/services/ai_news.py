@@ -117,8 +117,7 @@ def build_news_prompt(event_type: str, details: dict, standings: list[str], hist
         "   - Section 1 (Title): Strictly output '📻 <b>THE MYLC TIMES</b>'\n"
         "   - Section 2 (Actual Event): Summarize what just happened in exactly one short, punchy sentence.\n"
         "   - Section 3 (Implications / Commentary): Discuss the leaderboard impact or rivalries in exactly one short, witty sentence.\n"
-        "2. Do NOT use markdown asterisks (**) for bolding. Use HTML bold tags (<b>...</b>) for any bolding. Ensure every single opening <b> tag has a matching closing </b> tag—do NOT leave any tags unclosed.\n"
-        "3. Keep the total message under 40 words."
+        "2. Do NOT use markdown asterisks (**) for bolding. Use HTML bold tags (<b>...</b>) for any bolding. Ensure every single opening <b> tag has a matching closing </b> tag—do NOT leave any tags unclosed."
     )
 
     event_desc = ""
