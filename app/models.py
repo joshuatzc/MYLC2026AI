@@ -326,3 +326,79 @@ class GroupQuizState(Base):
             f"<GroupQuizState group={self.group_id} q={self.current_question_index}"
             f" correct={self.correct_count} wrong={self.wrong_count} done={self.completed}>"
         )
+
+
+# ---------------------------------------------------------------------------
+# Ice Breaker pre-game
+# ---------------------------------------------------------------------------
+
+PLACEMENT_POINTS: dict[int, int] = {
+    1: 500,
+    2: 400,
+    3: 300,
+    4: 200,
+    5: 100,
+}
+"""Points awarded per placement in a ranking-style ice breaker mini-game."""
+
+# Scoring types
+SCORING_RANKING = "ranking"       # Top 5 get 500/400/300/200/100
+SCORING_SINGLE  = "single"        # 1 winner gets 500
+SCORING_POINTS  = "points"        # Admin inputs custom points per group directly
+
+
+class IceBreakerGame(Base):
+    """One mini-game from the ice breaker day."""
+
+    __tablename__ = "icebreaker_games"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(200), nullable=False, unique=True)
+
+    # How scores are determined:
+    #   "ranking" – top 5 ranked; standard 500/400/300/200/100
+    #   "single"  – 1 winner; 500 pts to that group only
+    #   "points"  – admin enters points per group directly (e.g. 100 per correct answer)
+    scoring_type = Column(String(20), nullable=False, default=SCORING_RANKING)
+
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    results = relationship(
+        "IceBreakerResult",
+        back_populates="game",
+        cascade="all, delete-orphan",
+        order_by="IceBreakerResult.points.desc()",
+    )
+
+    def __repr__(self) -> str:
+        return f"<IceBreakerGame id={self.id} name={self.name!r} type={self.scoring_type!r}>"
+
+
+class IceBreakerResult(Base):
+    """Score record for one group in one ice breaker game."""
+
+    __tablename__ = "icebreaker_results"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    game_id = Column(Integer, ForeignKey("icebreaker_games.id"), nullable=False)
+    group_id = Column(Integer, ForeignKey("groups.id"), nullable=False)
+    # For ranking/single games: 1 = 1st, 2 = 2nd, … 5 = 5th.
+    # For direct-points games: NULL (placement derived from points at query time).
+    placement = Column(Integer, nullable=True)
+    # Points this group earned in this game.
+    points = Column(Integer, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "game_id", "group_id", name="uq_icebreaker_game_group"
+        ),
+    )
+
+    game = relationship("IceBreakerGame", back_populates="results")
+    group = relationship("Group", foreign_keys=[group_id])
+
+    def __repr__(self) -> str:
+        return (
+            f"<IceBreakerResult game={self.game_id} group={self.group_id}"
+            f" placement={self.placement} pts={self.points}>"
+        )

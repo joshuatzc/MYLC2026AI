@@ -540,7 +540,8 @@ async def buy_church_hint(
     N = completions_res.scalar() or 0
 
     # 5. Calculate discounted cost percentage
-    base_percentage = hint_number * 0.05  # 5%, 10%, 15%
+    _hint_base = {1: 0.10, 2: 0.12, 3: 0.15}  # 10%, 12%, 15%
+    base_percentage = _hint_base[hint_number]
     cost_percentage = max(0.03, base_percentage - (N * 0.01))
     cost = round(group.population * cost_percentage)
 

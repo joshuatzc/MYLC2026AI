@@ -106,12 +106,14 @@ def admin_eligible_keyboard(
     eligible: list[dict],
     super_pastor_active: bool = False,
     corruption_quiz_available: bool = False,
+    rename_available: bool = True,
 ) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    builder.button(
-        text="✏️ Rename Church",
-        callback_data="admin_rename_church_start",
-    )
+    if rename_available:
+        builder.button(
+            text="✏️ Rename Church",
+            callback_data="admin_rename_church_start",
+        )
     if super_pastor_active:
         builder.button(
             text="🌟 Claim Super Pastor",

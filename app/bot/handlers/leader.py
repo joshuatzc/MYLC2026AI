@@ -116,6 +116,11 @@ async def cb_admin_cancel(callback: CallbackQuery) -> None:
 async def cb_admin_rename_church_start(callback: CallbackQuery) -> None:
     chat_id = str(callback.message.chat.id)
     async with AsyncSessionLocal() as db:
+        from app.services import icebreaker
+        mode = await icebreaker.get_game_mode(db)
+        if mode == "icebreaker":
+            await callback.answer("⚠️ Church renaming is disabled during the Day Games (Ice Breakers)!", show_alert=True)
+            return
         await auth.set_awaiting(db, chat_id, "rename_church")
 
     builder = InlineKeyboardBuilder()
@@ -304,20 +309,35 @@ async def _show_admin_eligible(
             )).scalar_one_or_none()
             corruption_quiz_available = not (quiz_state and quiz_state.completed)
 
+        # Check if renaming is available (disabled during icebreaker mode)
+        from app.services import icebreaker
+        mode = await icebreaker.get_game_mode(db)
+        rename_available = (mode != "icebreaker")
+
     group_name = group.name if group else "?"
 
     if not eligible:
         text = f"Your group *{group_name}* has no eligible upgrades right now."
         if sp_active:
             text = f"Your group *{group_name}* has no standard eligible upgrades right now, but a 🌟 *Super Pastor* is active!"
-        kb = admin_eligible_keyboard([], super_pastor_active=sp_active, corruption_quiz_available=corruption_quiz_available)
+        kb = admin_eligible_keyboard(
+            [],
+            super_pastor_active=sp_active,
+            corruption_quiz_available=corruption_quiz_available,
+            rename_available=rename_available,
+        )
     else:
         text = f"⬆️ *Eligible upgrades for {group_name}:*"
         if sp_active:
             text = f"🌟 *SPECIAL EVENT ACTIVE: THE SUPER PASTOR HAS ARRIVED!* 🏃‍♂️💨\n\nBring the items to him IRL first to claim! Or proceed with standard upgrades below:\n\n{text}"
         if corruption_quiz_available:
             text = f"📜 *CORRUPTION INVESTIGATION ACTIVE!* Prove your legitimacy in the Admin Section above.\n\n{text}"
-        kb = admin_eligible_keyboard(eligible, super_pastor_active=sp_active, corruption_quiz_available=corruption_quiz_available)
+        kb = admin_eligible_keyboard(
+            eligible,
+            super_pastor_active=sp_active,
+            corruption_quiz_available=corruption_quiz_available,
+            rename_available=rename_available,
+        )
 
     if edit:
         await message.edit_text(text, parse_mode="Markdown", reply_markup=kb)
@@ -394,7 +414,8 @@ async def cb_admin_upgrade_detail(callback: CallbackQuery) -> None:
                 
                 cost_pct = 0
                 if next_hint_num is not None:
-                    base_percentage = next_hint_num * 0.05  # 5%, 10%, 15%
+                    _hint_base = {1: 0.10, 2: 0.12, 3: 0.15}  # 10%, 12%, 15%
+                    base_percentage = _hint_base[next_hint_num]
                     cost_pct = round(max(0.03, base_percentage - (N * 0.01)) * 100)
                 
                 text = (

@@ -237,11 +237,32 @@ async def seed(db: AsyncSession) -> None:
         ("corruption_active", False, None, None),
         ("corruption_duration", None, None, None),
         ("corruption_started_at", None, None, None),
+        # Game mode: starts as 'icebreaker' (ice breaker day) and is switched
+        # to 'nightgame' by the admin via scripts/icebreaker.sh before night games.
+        ("game_mode", None, None, "icebreaker"),
     ]:
         res = await db.execute(select(GlobalState).where(GlobalState.key == key))
         if not res.scalar_one_or_none():
             db.add(GlobalState(key=key, value_bool=val_bool, value_int=val_int, value_str=val_str))
 
+    # ------------------------------------------------------------------
+    # Pre-seed Ice Breaker Games
+    # ------------------------------------------------------------------
+    from app.models import IceBreakerGame
+    ice_breaker_games = [
+        ("Longest Pinky", "ranking"),
+        ("Chubby Bunny (Mouth Volume)", "ranking"),
+        ("Most 6/7", "ranking"),
+        ("Blind Karaoke", "points"),
+        ("Chemistry Competition", "points"),
+        ("Scratch My Back", "points"),
+        ("Taste So Good", "points"),
+    ]
+    for name, s_type in ice_breaker_games:
+        res_game = await db.execute(select(IceBreakerGame).where(IceBreakerGame.name == name))
+        if not res_game.scalar_one_or_none():
+            db.add(IceBreakerGame(name=name, scoring_type=s_type))
+            print(f"  ✚  Pre-seeded Ice Breaker Game: {name} ({s_type})")
 
     await db.commit()
 

@@ -10,6 +10,16 @@ Endpoints:
   GET  /admin/stations           – list stations + levels
   POST /admin/stations           – create a station
   POST /admin/stations/{id}/levels – add a level to a station
+
+  --- Ice Breaker pre-game ---
+  GET  /admin/icebreaker/mode                    – get current game mode
+  POST /admin/icebreaker/mode                    – set game mode manually
+  GET  /admin/icebreaker/games                   – list all games + results
+  POST /admin/icebreaker/games                   – register a new game
+  POST /admin/icebreaker/games/{id}/results      – record/overwrite results
+  DELETE /admin/icebreaker/games/{id}/results    – clear results for a game
+  GET  /admin/icebreaker/standings               – preview standings + bonuses
+  POST /admin/icebreaker/finalize                – apply bonuses + switch to nightgame
 """
 from __future__ import annotations
 
@@ -644,3 +654,130 @@ async def corruption_event_status(
         })
 
     return {"active": active, "groups_progress": groups_progress}
+
+
+# ---------------------------------------------------------------------------
+# Ice Breaker pre-game
+# ---------------------------------------------------------------------------
+
+class GameModeSet(BaseModel):
+    mode: str  # "icebreaker" or "nightgame"
+
+
+class IceBreakerGameCreate(BaseModel):
+    name: str
+    scoring_type: str = "ranking"  # "ranking", "single", "points"
+
+
+class IceBreakerResultsSubmit(BaseModel):
+    placements: list[int] | None = None
+    scores: dict[int, int] | None = None
+
+
+@router.get("/icebreaker/mode")
+async def get_icebreaker_mode(
+    db: AsyncSession = Depends(get_session),
+    _: None = Depends(_require_admin_key),
+) -> dict:
+    """Return the current game mode ('icebreaker' or 'nightgame')."""
+    from app.services import icebreaker
+    mode = await icebreaker.get_game_mode(db)
+    return {"game_mode": mode}
+
+
+@router.post("/icebreaker/mode")
+async def set_icebreaker_mode(
+    body: GameModeSet,
+    db: AsyncSession = Depends(get_session),
+    _: None = Depends(_require_admin_key),
+) -> dict:
+    """Manually override the game mode."""
+    from app.services import icebreaker
+    if body.mode not in ("icebreaker", "nightgame"):
+        raise HTTPException(status_code=400, detail="mode must be 'icebreaker' or 'nightgame'.")
+    await icebreaker.set_game_mode(db, body.mode)
+    return {"game_mode": body.mode}
+
+
+@router.get("/icebreaker/games")
+async def list_icebreaker_games(
+    db: AsyncSession = Depends(get_session),
+    _: None = Depends(_require_admin_key),
+) -> list[dict]:
+    """List all registered ice breaker games and their results."""
+    from app.services import icebreaker
+    return await icebreaker.get_all_games(db)
+
+
+@router.post("/icebreaker/games", status_code=201)
+async def create_icebreaker_game(
+    body: IceBreakerGameCreate,
+    db: AsyncSession = Depends(get_session),
+    _: None = Depends(_require_admin_key),
+) -> dict:
+    """Register a new ice breaker mini-game."""
+    from app.services import icebreaker
+    try:
+        return await icebreaker.register_game(db, body.name, body.scoring_type)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post("/icebreaker/games/{game_id}/results")
+async def submit_icebreaker_results(
+    game_id: int,
+    body: IceBreakerResultsSubmit,
+    db: AsyncSession = Depends(get_session),
+    _: None = Depends(_require_admin_key),
+) -> dict:
+    """Record (or overwrite) results for a game."""
+    from app.services import icebreaker
+    try:
+        return await icebreaker.record_results(
+            db, game_id, placements=body.placements, scores=body.scores
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.delete("/icebreaker/games/{game_id}/results")
+async def clear_icebreaker_results(
+    game_id: int,
+    db: AsyncSession = Depends(get_session),
+    _: None = Depends(_require_admin_key),
+) -> dict:
+    """Clear all results for a game so they can be re-entered."""
+    from app.services import icebreaker
+    try:
+        return await icebreaker.delete_game_results(db, game_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@router.get("/icebreaker/standings")
+async def get_icebreaker_standings(
+    db: AsyncSession = Depends(get_session),
+    _: None = Depends(_require_admin_key),
+) -> list[dict]:
+    """Preview the current overall standings and starting-pop bonuses."""
+    from app.services import icebreaker
+    return await icebreaker.get_standings(db)
+
+
+@router.post("/icebreaker/finalize")
+async def finalize_icebreaker(
+    db: AsyncSession = Depends(get_session),
+    _: None = Depends(_require_admin_key),
+) -> dict:
+    """Apply ice breaker population bonuses to all groups and switch to nightgame mode.
+
+    This is idempotent — calling it a second time resets populations to the
+    same values again (useful for corrections).
+    """
+    from app.services import icebreaker
+    standings = await icebreaker.apply_bonuses(db)
+    return {
+        "status": "ok",
+        "message": "Ice breaker bonuses applied. Game mode switched to nightgame.",
+        "standings": standings,
+    }

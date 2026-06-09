@@ -10,6 +10,8 @@ load_dotenv()
 class Settings:
     # --- Telegram ---
     TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")
+    # Separate bot token for the ice breaker day bot
+    DAY_BOT_TOKEN: str = os.getenv("DAY_BOT_TOKEN", "YOUR_DAY_BOT_TOKEN_HERE")
 
     # --- Auth ---
     LEADER_PASSWORD: str = os.getenv("LEADER_PASSWORD", "changeme")

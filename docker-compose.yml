@@ -1,4 +1,5 @@
 services:
+  # ── Night Games Bot + Admin API ─────────────────────────────────────────────
   mylc-bot:
     build: .
     container_name: mylc-bot
@@ -18,7 +19,6 @@ services:
 
     volumes:
       # Persists church_game.db across restarts and redeployments
-      # On Synology, this maps to a named Docker volume managed by Container Manager
       - mylc_data:/data
 
     # Health check — Container Manager will show green/red status
@@ -28,6 +28,32 @@ services:
       timeout: 10s
       retries: 3
       start_period: 15s
+
+  # ── Day Bot (Ice Breaker Scorer) ─────────────────────────────────────────────
+  # Same image, different entry point — shares the same SQLite database volume.
+  # The scorer uses this bot on Telegram during the ice breaker day to enter results.
+  # You (Ethan) still use scripts/icebreaker.sh via SSH for the final confirmation.
+  mylc-day-bot:
+    build: .
+    container_name: mylc-day-bot
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:////data/church_game.db
+
+    volumes:
+      # Same shared volume — both bots read/write one database file
+      - mylc_data:/data
+
+    # Override the default CMD (uvicorn) with the day bot polling script
+    command: ["python", "-m", "app.day_bot_runner"]
+
+    # No port exposure needed — this container only polls Telegram
+    depends_on:
+      - mylc-bot
 
 volumes:
   mylc_data:
