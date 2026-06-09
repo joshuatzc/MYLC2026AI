@@ -20,6 +20,8 @@ from aiogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     Message,
+    ReplyKeyboardMarkup,
+    KeyboardButton,
 )
 
 from app.database import AsyncSessionLocal
@@ -47,9 +49,7 @@ class AuthState(StatesGroup):
     waiting_for_password = State()
 
 
-class AddGameState(StatesGroup):
-    waiting_for_name = State()
-    waiting_for_type = State()
+
 
 
 class EnterResultsState(StatesGroup):
@@ -68,20 +68,14 @@ ORDINALS = ["1st", "2nd", "3rd", "4th", "5th"]
 PTS_MAP = {1: 500, 2: 400, 3: 300, 4: 200, 5: 100}
 
 
-def _main_menu_kb() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="📋 List Games", callback_data="ib:list"),
-            InlineKeyboardButton(text="➕ Add Game", callback_data="ib:add"),
+def _main_menu_kb() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="🎯 Enter Results"), KeyboardButton(text="🏆 Standings")],
+            [KeyboardButton(text="✅ Finalize")],
         ],
-        [
-            InlineKeyboardButton(text="🎯 Enter Results", callback_data="ib:results"),
-            InlineKeyboardButton(text="🏆 Standings", callback_data="ib:standings"),
-        ],
-        [
-            InlineKeyboardButton(text="✅  Finalize → Open Night Games", callback_data="ib:finalize"),
-        ],
-    ])
+        resize_keyboard=True
+    )
 
 
 def _back_kb() -> InlineKeyboardMarkup:
@@ -126,21 +120,7 @@ def _games_kb(games: list[dict], prefix: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def _game_type_kb() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="🥇 Top 5 (Ranking)", callback_data="ib:add:type:ranking"),
-        ],
-        [
-            InlineKeyboardButton(text="🏆 1 Winner (Single)", callback_data="ib:add:type:single"),
-        ],
-        [
-            InlineKeyboardButton(text="🎯 Custom (Direct Points)", callback_data="ib:add:type:points"),
-        ],
-        [
-            InlineKeyboardButton(text="✖ Cancel", callback_data="ib:menu"),
-        ]
-    ])
+
 
 
 def _points_group_kb(
@@ -190,11 +170,9 @@ async def _load_groups() -> list[dict]:
 
 
 async def _show_main_menu(target: Message | CallbackQuery, edit: bool = False) -> None:
-    text = "🏆 <b>MYLC Ice Breaker Scorer</b>\n\nSelect an action:"
+    text = "🏆 <b>MYLC Ice Breaker Scorer</b>\n\nUse the buttons below to navigate:"
     kb = _main_menu_kb()
-    if edit and isinstance(target, CallbackQuery):
-        await target.message.edit_text(text, reply_markup=kb)
-    elif isinstance(target, CallbackQuery):
+    if isinstance(target, CallbackQuery):
         await target.message.answer(text, reply_markup=kb)
     else:
         await target.answer(text, reply_markup=kb)
@@ -240,120 +218,11 @@ async def cb_menu(callback: CallbackQuery, state: FSMContext) -> None:
         await callback.answer("Not authenticated — send /start", show_alert=True)
         return
     await state.clear()
-    await _show_main_menu(callback, edit=True)
-    await callback.answer()
-
-
-# ---------------------------------------------------------------------------
-# 📋  List Games
-# ---------------------------------------------------------------------------
-
-@router.callback_query(F.data == "ib:list")
-async def cb_list_games(callback: CallbackQuery) -> None:
-    if not _is_auth(str(callback.message.chat.id)):
-        await callback.answer("Not authenticated.", show_alert=True)
-        return
-
-    async with AsyncSessionLocal() as db:
-        games = await icebreaker.get_all_games(db)
-
-    if not games:
-        await callback.message.edit_text(
-            "📋 <b>Games</b>\n\nNo games registered yet.",
-            reply_markup=_back_kb(),
-        )
-        await callback.answer()
-        return
-
-    lines = ["📋 <b>Registered Games</b>\n"]
-    for g in games:
-        s_type = g.get("scoring_type", "ranking")
-        if s_type == "points":
-            tag = " <i>(direct points)</i>"
-        elif s_type == "single":
-            tag = " <i>(single winner)</i>"
-        else:
-            tag = " <i>(ranking)</i>"
-
-        lines.append(f"<b>[{g['id']}] {g['name']}</b>{tag}")
-        if g["results"]:
-            if s_type == "points":
-                # Sort by points desc
-                for r in sorted(g["results"], key=lambda x: -x["points"]):
-                    lines.append(f"  • {r['group_name']}: +{r['points']} pts")
-            else:
-                for r in sorted(g["results"], key=lambda x: x["placement"] or 999):
-                    p_label = ORDINALS[r['placement'] - 1] if (r['placement'] and r['placement'] <= 5) else f"{r['placement']}th"
-                    lines.append(
-                        f"  {p_label}: {r['group_name']}  (+{r['points']} pts)"
-                    )
-        else:
-            lines.append("  <i>No results entered yet</i>")
-        lines.append("")
-
-    await callback.message.edit_text("\n".join(lines), reply_markup=_back_kb())
-    await callback.answer()
-
-
-# ---------------------------------------------------------------------------
-# ➕  Add Game
-# ---------------------------------------------------------------------------
-
-@router.callback_query(F.data == "ib:add")
-async def cb_add_game_start(callback: CallbackQuery, state: FSMContext) -> None:
-    if not _is_auth(str(callback.message.chat.id)):
-        await callback.answer("Not authenticated.", show_alert=True)
-        return
-    await state.set_state(AddGameState.waiting_for_name)
-    await callback.message.edit_text(
-        "➕ <b>Add New Game</b>\n\nType the game name:",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text="✖ Cancel", callback_data="ib:menu"),
-        ]]),
-    )
-    await callback.answer()
-
-
-@router.message(AddGameState.waiting_for_name)
-async def handle_game_name(message: Message, state: FSMContext) -> None:
-    name = message.text.strip() if message.text else ""
-    if not name:
-        await message.answer("Please type a game name:")
-        return
-    await state.update_data(game_name=name)
-    await state.set_state(AddGameState.waiting_for_type)
-    await message.answer(
-        f"Game: <b>{name}</b>\n\nSelect the scoring type for this game:",
-        reply_markup=_game_type_kb(),
-    )
-
-
-@router.callback_query(F.data.startswith("ib:add:type:"))
-async def cb_game_type(callback: CallbackQuery, state: FSMContext) -> None:
-    data = await state.get_data()
-    game_name: str = data.get("game_name", "")
-    scoring_type = callback.data.split(":")[-1]
-
-    async with AsyncSessionLocal() as db:
-        try:
-            result = await icebreaker.register_game(db, game_name, scoring_type)
-        except ValueError as exc:
-            await state.clear()
-            await callback.message.edit_text(f"❌ {exc}", reply_markup=_back_kb())
-            await callback.answer()
-            return
-
-    labels = {
-        "ranking": "Top 5 (Ranking)",
-        "single": "1 Winner (Single)",
-        "points": "Custom (Direct Points)",
-    }
-    label = labels.get(scoring_type, scoring_type)
-    await state.clear()
-    await callback.message.edit_text(
-        f"✅ Game added!\n\n<b>{game_name}</b>\nType: {label}\nID: {result['id']}",
-        reply_markup=_back_kb(),
-    )
+    try:
+        await callback.message.delete()
+    except Exception:
+        await callback.message.edit_text("Menu closed.")
+    await _show_main_menu(callback)
     await callback.answer()
 
 
@@ -361,28 +230,26 @@ async def cb_game_type(callback: CallbackQuery, state: FSMContext) -> None:
 # 🎯  Enter Results
 # ---------------------------------------------------------------------------
 
-@router.callback_query(F.data == "ib:results")
-async def cb_results_start(callback: CallbackQuery, state: FSMContext) -> None:
-    if not _is_auth(str(callback.message.chat.id)):
-        await callback.answer("Not authenticated.", show_alert=True)
+@router.message(F.text == "🎯 Enter Results")
+async def msg_results_start(message: Message, state: FSMContext) -> None:
+    if not _is_auth(str(message.chat.id)):
+        await message.answer("Not authenticated.")
         return
 
     async with AsyncSessionLocal() as db:
         games = await icebreaker.get_all_games(db)
 
     if not games:
-        await callback.message.edit_text(
-            "❌ No games yet. Add a game first.", reply_markup=_back_kb()
+        await message.answer(
+            "❌ No games yet. Add a game first."
         )
-        await callback.answer()
         return
 
     await state.set_state(EnterResultsState.waiting_for_game)
-    await callback.message.edit_text(
+    await message.answer(
         "🎯 <b>Enter Results</b>\n\nSelect a game:",
         reply_markup=_games_kb(games, "ib:results:game"),
     )
-    await callback.answer()
 
 
 @router.callback_query(F.data.startswith("ib:results:game:"))
@@ -663,10 +530,10 @@ async def cb_results_confirm(callback: CallbackQuery, state: FSMContext) -> None
 # 🏆  Standings
 # ---------------------------------------------------------------------------
 
-@router.callback_query(F.data == "ib:standings")
-async def cb_standings(callback: CallbackQuery) -> None:
-    if not _is_auth(str(callback.message.chat.id)):
-        await callback.answer("Not authenticated.", show_alert=True)
+@router.message(F.text == "🏆 Standings")
+async def msg_standings(message: Message) -> None:
+    if not _is_auth(str(message.chat.id)):
+        await message.answer("Not authenticated.")
         return
 
     async with AsyncSessionLocal() as db:
@@ -682,18 +549,17 @@ async def cb_standings(callback: CallbackQuery) -> None:
             f"→ starts at <b>{s['final_starting_pop']}</b> ({bonus})"
         )
 
-    await callback.message.edit_text("\n".join(lines), reply_markup=_back_kb())
-    await callback.answer()
+    await message.answer("\n".join(lines))
 
 
 # ---------------------------------------------------------------------------
 # ✅  Finalize → Open Night Games
 # ---------------------------------------------------------------------------
 
-@router.callback_query(F.data == "ib:finalize")
-async def cb_finalize_preview(callback: CallbackQuery) -> None:
-    if not _is_auth(str(callback.message.chat.id)):
-        await callback.answer("Not authenticated.", show_alert=True)
+@router.message(F.text == "✅ Finalize")
+async def msg_finalize_preview(message: Message) -> None:
+    if not _is_auth(str(message.chat.id)):
+        await message.answer("Not authenticated.")
         return
 
     async with AsyncSessionLocal() as db:
@@ -712,7 +578,7 @@ async def cb_finalize_preview(callback: CallbackQuery) -> None:
             f"  {medal} {s['group_name']}: <b>{s['final_starting_pop']}</b> people ({bonus})"
         )
 
-    await callback.message.edit_text(
+    await message.answer(
         "\n".join(lines),
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [
@@ -721,7 +587,6 @@ async def cb_finalize_preview(callback: CallbackQuery) -> None:
             ],
         ]),
     )
-    await callback.answer()
 
 
 @router.callback_query(F.data == "ib:finalize:confirm")
