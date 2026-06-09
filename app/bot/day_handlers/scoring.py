@@ -56,6 +56,7 @@ class EnterResultsState(StatesGroup):
     waiting_for_game = State()
     waiting_for_placement = State()
     waiting_for_points_group_select = State()
+    waiting_for_points_multiselect = State()
     waiting_for_points_value = State()
     waiting_for_confirm = State()
 
@@ -268,28 +269,51 @@ async def cb_results_pick_game(callback: CallbackQuery, state: FSMContext) -> No
     if game["results"]:
         overwrite_note = (
             "\n\n⚠️ <i>This game already has results — "
-            "entering new ones will replace them.</i>"
+            "entering new ones will add/edit them.</i>"
         )
 
     scoring_type = game.get("scoring_type", "ranking")
+    game_name = game["name"]
 
     if scoring_type == "points":
         # Pre-populate scores from existing results
         scores = {r["group_id"]: r["points"] for r in game["results"]}
-        await state.update_data(
-            game_id=game_id,
-            game_name=game["name"],
-            scoring_type=scoring_type,
-            scores=scores,
-            current_editing_group_id=None,
-        )
-        await state.set_state(EnterResultsState.waiting_for_points_group_select)
-        await _show_points_group_select(callback, state)
+
+        if game_name in ("Chemistry Competition", "Scratch My Back"):
+            await state.update_data(
+                game_id=game_id,
+                game_name=game_name,
+                scoring_type=scoring_type,
+                scores=scores,
+                selected_group_ids=[],
+            )
+            await state.set_state(EnterResultsState.waiting_for_points_multiselect)
+            await _show_points_multiselect(callback, state)
+        elif game_name == "Blind Karaoke":
+            await state.update_data(
+                game_id=game_id,
+                game_name=game_name,
+                scoring_type=scoring_type,
+                scores=scores,
+                single_select_group_id=None,
+            )
+            await state.set_state(EnterResultsState.waiting_for_points_group_select)
+            await _show_points_single_select(callback, state)
+        else:
+            await state.update_data(
+                game_id=game_id,
+                game_name=game_name,
+                scoring_type=scoring_type,
+                scores=scores,
+                current_editing_group_id=None,
+            )
+            await state.set_state(EnterResultsState.waiting_for_points_group_select)
+            await _show_points_group_select(callback, state)
     else:
         max_places = 1 if scoring_type == "single" else 5
         await state.update_data(
             game_id=game_id,
-            game_name=game["name"],
+            game_name=game_name,
             scoring_type=scoring_type,
             max_places=max_places,
             placements=[],
@@ -300,10 +324,181 @@ async def cb_results_pick_game(callback: CallbackQuery, state: FSMContext) -> No
         groups = await _load_groups()
         place_label = "only winner" if scoring_type == "single" else "1st place"
         await callback.message.edit_text(
-            f"🎯 <b>{game['name']}</b>{overwrite_note}\n\n"
+            f"🎯 <b>{game_name}</b>{overwrite_note}\n\n"
             f"Who came <b>{place_label}</b>?",
             reply_markup=_group_kb(groups, "ib:pick", show_done=False),
         )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "ib:results")
+async def cb_results_redo(callback: CallbackQuery, state: FSMContext) -> None:
+    data = await state.get_data()
+    game_id = data.get("game_id")
+    if not game_id:
+        await callback.answer("Session expired.", show_alert=True)
+        return
+
+    # Simulate game pick to restart entry
+    callback.data = f"ib:results:game:{game_id}"
+    await cb_results_pick_game(callback, state)
+
+
+def _points_multiselect_kb(
+    groups: list[dict],
+    selected_ids: list[int],
+) -> InlineKeyboardMarkup:
+    """Group picker for Chemistry/Scratch My Back — toggles checks next to groups."""
+    selected_set = set(selected_ids)
+    buttons = []
+    for g in groups:
+        label = f"✅ {g['name']}" if g["id"] in selected_set else f"☐ {g['name']}"
+        buttons.append(InlineKeyboardButton(text=label, callback_data=f"ib:pts:toggle:{g['id']}"))
+
+    rows: list[list[InlineKeyboardButton]] = [
+        buttons[i:i + 2] for i in range(0, len(buttons), 2)
+    ]
+    rows.append([
+        InlineKeyboardButton(text="✓ Done & Add +100 pts", callback_data="ib:pts:multi_done"),
+        InlineKeyboardButton(text="✖ Cancel", callback_data="ib:menu")
+    ])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+async def _show_points_multiselect(
+    callback: CallbackQuery,
+    state: FSMContext,
+) -> None:
+    data = await state.get_data()
+    game_name = data["game_name"]
+    selected_group_ids = data["selected_group_ids"]
+
+    groups = await _load_groups()
+
+    lines = [
+        f"🎯 <b>{game_name}</b> (+100 pts per round win)",
+        "Select all groups that won this round. Tapping a group toggles selection. Click <b>Done & Add +100 pts</b> when finished.\n",
+        "<b>Selected Groups:</b>"
+    ]
+    selected_names = []
+    selected_set = set(selected_group_ids)
+    for g in groups:
+        if g["id"] in selected_set:
+            selected_names.append(g["name"])
+
+    if selected_names:
+        lines.append(", ".join(selected_names))
+    else:
+        lines.append("<i>None selected yet</i>")
+
+    reply_markup = _points_multiselect_kb(groups, selected_group_ids)
+    await callback.message.edit_text("\n".join(lines), reply_markup=reply_markup)
+
+
+@router.callback_query(F.data.startswith("ib:pts:toggle:"))
+async def cb_points_toggle_group(callback: CallbackQuery, state: FSMContext) -> None:
+    group_id = int(callback.data.split(":")[-1])
+    data = await state.get_data()
+    selected_group_ids: list[int] = data["selected_group_ids"]
+
+    if group_id in selected_group_ids:
+        selected_group_ids.remove(group_id)
+    else:
+        selected_group_ids.append(group_id)
+
+    await state.update_data(selected_group_ids=selected_group_ids)
+    await _show_points_multiselect(callback, state)
+    await callback.answer()
+
+
+@router.callback_query(F.data == "ib:pts:multi_done")
+async def cb_points_multi_done(callback: CallbackQuery, state: FSMContext) -> None:
+    data = await state.get_data()
+    selected_group_ids: list[int] = data["selected_group_ids"]
+    game_name: str = data["game_name"]
+    scores: dict[int, int] = data["scores"]
+
+    groups = await _load_groups()
+    lines = [
+        f"📋 <b>Confirm additions for: {game_name}</b>\n",
+        "The following groups will be added <b>+100 points</b>:\n"
+    ]
+    if selected_group_ids:
+        for gid in selected_group_ids:
+            gname = next((g["name"] for g in groups if g["id"] == gid), f"Group {gid}")
+            current_total = scores.get(gid, 0)
+            new_total = current_total + 100
+            lines.append(f"  • {gname}: <b>+100 pts</b> (New Total: <b>{new_total} pts</b>)")
+    else:
+        lines.append("  <i>None (no points will be added)</i>")
+
+    await state.set_state(EnterResultsState.waiting_for_confirm)
+    await callback.message.edit_text(
+        "\n".join(lines),
+        reply_markup=_confirm_redo_kb("ib:results:confirm", "ib:results"),
+    )
+    await callback.answer()
+
+
+def _points_single_select_kb(
+    groups: list[dict],
+) -> InlineKeyboardMarkup:
+    """Group picker for Blind Karaoke — one tap selects and triggers confirmation."""
+    buttons = [
+        InlineKeyboardButton(text=g["name"], callback_data=f"ib:pts:single:{g['id']}")
+        for g in groups
+    ]
+    rows: list[list[InlineKeyboardButton]] = [
+        buttons[i:i + 2] for i in range(0, len(buttons), 2)
+    ]
+    rows.append([
+        InlineKeyboardButton(text="✖ Cancel", callback_data="ib:menu")
+    ])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+async def _show_points_single_select(
+    callback: CallbackQuery,
+    state: FSMContext,
+) -> None:
+    data = await state.get_data()
+    game_name = data["game_name"]
+    groups = await _load_groups()
+
+    lines = [
+        f"🎯 <b>{game_name}</b> (+300 pts per round win)",
+        "Select the group that won this round. Tapping a group will go straight to the confirmation screen."
+    ]
+
+    reply_markup = _points_single_select_kb(groups)
+    await callback.message.edit_text("\n".join(lines), reply_markup=reply_markup)
+
+
+@router.callback_query(F.data.startswith("ib:pts:single:"))
+async def cb_points_single_pick(callback: CallbackQuery, state: FSMContext) -> None:
+    group_id = int(callback.data.split(":")[-1])
+    data = await state.get_data()
+    game_name: str = data["game_name"]
+    scores: dict[int, int] = data["scores"]
+
+    groups = await _load_groups()
+    gname = next((g["name"] for g in groups if g["id"] == group_id), f"Group {group_id}")
+    current_total = scores.get(group_id, 0)
+    new_total = current_total + 300
+
+    await state.update_data(single_select_group_id=group_id)
+
+    lines = [
+        f"📋 <b>Confirm addition for: {game_name}</b>\n",
+        f"The following group will be added <b>+300 points</b>:\n",
+        f"  • {gname}: <b>+300 pts</b> (New Total: <b>{new_total} pts</b>)"
+    ]
+
+    await state.set_state(EnterResultsState.waiting_for_confirm)
+    await callback.message.edit_text(
+        "\n".join(lines),
+        reply_markup=_confirm_redo_kb("ib:results:confirm", "ib:results"),
+    )
     await callback.answer()
 
 
@@ -500,16 +695,64 @@ async def cb_results_confirm(callback: CallbackQuery, state: FSMContext) -> None
     game_name: str = data["game_name"]
     scoring_type: str = data.get("scoring_type", "ranking")
 
+    # Load groups for names
+    groups = await _load_groups()
+
+    summary_lines = [
+        f"✅ <b>Results saved!</b>",
+        f"🎯 Game: <b>{game_name}</b>",
+    ]
+
     async with AsyncSessionLocal() as db:
         try:
             if scoring_type == "points":
                 scores: dict[int, int] = data["scores"]
-                await icebreaker.record_results(db, game_id, scores=scores)
-                num_records = len([pts for pts in scores.values() if pts > 0])
+
+                if game_name in ("Chemistry Competition", "Scratch My Back"):
+                    selected_group_ids: list[int] = data["selected_group_ids"]
+                    for gid in selected_group_ids:
+                        scores[gid] = scores.get(gid, 0) + 100
+                    await icebreaker.record_results(db, game_id, scores=scores)
+
+                    summary_lines.append("\n<b>Scores Log (Round Added):</b>")
+                    if selected_group_ids:
+                        for gid in selected_group_ids:
+                            gname = next((g["name"] for g in groups if g["id"] == gid), f"Group {gid}")
+                            summary_lines.append(f"  • {gname}: <b>+100 pts</b> (New Total: <b>{scores[gid]} pts</b>)")
+                    else:
+                        summary_lines.append("  <i>None (no points added this round)</i>")
+
+                elif game_name == "Blind Karaoke":
+                    gid = data["single_select_group_id"]
+                    scores[gid] = scores.get(gid, 0) + 300
+                    await icebreaker.record_results(db, game_id, scores=scores)
+
+                    summary_lines.append("\n<b>Scores Log (Round Added):</b>")
+                    gname = next((g["name"] for g in groups if g["id"] == gid), f"Group {gid}")
+                    summary_lines.append(f"  • {gname}: <b>+300 pts</b> (New Total: <b>{scores[gid]} pts</b>)")
+
+                else:
+                    # General direct points (e.g. Taste So Good)
+                    await icebreaker.record_results(db, game_id, scores=scores)
+                    non_zero = {gid: pts for gid, pts in scores.items() if pts > 0}
+                    if non_zero:
+                        summary_lines.append("\n<b>Scores Log:</b>")
+                        for gid, pts in sorted(non_zero.items(), key=lambda x: -x[1]):
+                            gname = next((g["name"] for g in groups if g["id"] == gid), f"Group {gid}")
+                            summary_lines.append(f"  • {gname}: <b>+{pts} pts</b>")
+                    else:
+                        summary_lines.append("\n<i>No points were recorded (all 0)</i>")
             else:
                 placements: list[int] = data["placements"]
                 await icebreaker.record_results(db, game_id, placements=placements)
-                num_records = len(placements)
+                if placements:
+                    summary_lines.append("\n<b>Placements Log:</b>")
+                    for i, gid in enumerate(placements):
+                        gname = next((g["name"] for g in groups if g["id"] == gid), f"Group {gid}")
+                        pts = PTS_MAP.get(i + 1, 0)
+                        summary_lines.append(f"  • {ORDINALS[i]}: <b>{gname}</b> (+{pts} pts)")
+                else:
+                    summary_lines.append("\n<i>No placements were recorded</i>")
         except ValueError as exc:
             await state.clear()
             await callback.message.edit_text(f"❌ Error: {exc}", reply_markup=_back_kb())
@@ -518,10 +761,8 @@ async def cb_results_confirm(callback: CallbackQuery, state: FSMContext) -> None
 
     await state.clear()
     await callback.message.edit_text(
-        f"✅ <b>Results saved!</b>\n\n"
-        f"Game: {game_name}\n"
-        f"{num_records} group result(s) recorded.",
-        reply_markup=_back_kb(),
+        "\n".join(summary_lines),
+        reply_markup=None,  # removes inline buttons completely so it stays as a clean log message
     )
     await callback.answer("Saved!", show_alert=False)
 

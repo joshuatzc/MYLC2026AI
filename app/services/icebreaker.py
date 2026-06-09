@@ -182,28 +182,27 @@ async def record_results(
             })
 
     elif game.scoring_type == SCORING_POINTS:
-        if not scores:
-            raise ValueError("Scores dict cannot be empty for direct-points games.")
-        for gid, pts in scores.items():
-            if gid not in valid_groups:
-                raise ValueError(f"Group id={gid} not found.")
-            if pts < 0:
-                raise ValueError("Points cannot be negative.")
-            # Record non-zero points
-            if pts > 0:
-                result = IceBreakerResult(
-                    game_id=game_id,
-                    group_id=gid,
-                    placement=None,
-                    points=pts,
-                )
-                db.add(result)
-                recorded.append({
-                    "placement": None,
-                    "group_id": gid,
-                    "group_name": valid_groups[gid],
-                    "points": pts,
-                })
+        if scores:
+            for gid, pts in scores.items():
+                if gid not in valid_groups:
+                    raise ValueError(f"Group id={gid} not found.")
+                if pts < 0:
+                    raise ValueError("Points cannot be negative.")
+                # Record non-zero points
+                if pts > 0:
+                    result = IceBreakerResult(
+                        game_id=game_id,
+                        group_id=gid,
+                        placement=None,
+                        points=pts,
+                    )
+                    db.add(result)
+                    recorded.append({
+                        "placement": None,
+                        "group_id": gid,
+                        "group_name": valid_groups[gid],
+                        "points": pts,
+                    })
     else:
         raise ValueError(f"Unsupported scoring type: {game.scoring_type}")
 
