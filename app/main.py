@@ -10,9 +10,10 @@ import asyncio
 import logging
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import init_db
-from app.routers import admin
+from app.routers import admin, public
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -23,8 +24,36 @@ app = FastAPI(
     version="1.0.0",
 )
 
+# Add CORS Middleware to support React frontend queries
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+import os
+from fastapi.staticfiles import StaticFiles
+
 # Register routers
 app.include_router(admin.router)
+app.include_router(public.router)
+
+# Serve built static frontend files at root "/"
+# Check app/static (for Docker multi-stage build copy) or frontend/dist (for local development)
+static_path = os.path.join(os.path.dirname(__file__), "static")
+local_dist_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "dist")
+
+if os.path.exists(static_path):
+    app.mount("/", StaticFiles(directory=static_path, html=True), name="static")
+    logger.info("Serving frontend static files from: %s", static_path)
+elif os.path.exists(local_dist_path):
+    app.mount("/", StaticFiles(directory=local_dist_path, html=True), name="static")
+    logger.info("Serving frontend static files from: %s", local_dist_path)
+else:
+    logger.warning("No frontend static assets folder found. Root path '/' will not serve frontend.")
+
 
 
 @app.on_event("startup")

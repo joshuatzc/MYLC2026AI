@@ -307,7 +307,7 @@ async def _handle_game_scoring_start(callback: CallbackQuery, state: FSMContext,
         # Pre-populate scores from existing results
         scores = {r["group_id"]: r["points"] for r in game["results"]}
 
-        if game_name in ("Chemistry Competition", "Scratch My Back", "Chubby Bunny (Mouth Volume)"):
+        if game_name in ("Chemistry Competition", "Scratch My Back", "Chubby Bunny (Mouth Volume)", "Taste So Good - Drinker", "Taste So Good - Guesser"):
             await state.update_data(
                 game_id=game_id,
                 game_name=game_name,
@@ -377,12 +377,21 @@ async def cb_results_redo(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
 
 
+def _get_pts_per_win(game_name: str) -> int:
+    if game_name == "Taste So Good - Drinker":
+        return 500
+    elif game_name == "Chubby Bunny (Mouth Volume)":
+        return 300
+    else: # Taste So Good - Guesser, Chemistry Competition, Scratch My Back
+        return 100
+
+
 def _points_multiselect_kb(
     groups: list[dict],
     selected_ids: list[int],
     game_name: str,
 ) -> InlineKeyboardMarkup:
-    """Group picker for Chemistry/Scratch My Back/Chubby Bunny — toggles checks next to groups."""
+    """Group picker for Chemistry/Scratch My Back/Chubby Bunny/Taste So Good — toggles checks next to groups."""
     selected_set = set(selected_ids)
     buttons = []
     for g in groups:
@@ -392,7 +401,7 @@ def _points_multiselect_kb(
     rows: list[list[InlineKeyboardButton]] = [
         buttons[i:i + 2] for i in range(0, len(buttons), 2)
     ]
-    pts = 300 if game_name == "Chubby Bunny (Mouth Volume)" else 100
+    pts = _get_pts_per_win(game_name)
     rows.append([
         InlineKeyboardButton(text=f"✓ Done & Add +{pts} pts", callback_data="ib:pts:multi_done"),
         InlineKeyboardButton(text="✖ Cancel", callback_data="ib:menu")
@@ -409,13 +418,17 @@ async def _show_points_multiselect(
     selected_group_ids = data["selected_group_ids"]
 
     groups = await _load_groups()
-    pts = 300 if game_name == "Chubby Bunny (Mouth Volume)" else 100
+    pts = _get_pts_per_win(game_name)
 
     lines = [
         f"🎯 <b>{game_name}</b> (+{pts} pts per win)",
     ]
     if game_name == "Chubby Bunny (Mouth Volume)":
         lines.append("Select the <b>last 5 survivors</b> left standing. Tapping a group toggles selection. Click Done when finished.\n")
+    elif game_name == "Taste So Good - Drinker":
+        lines.append("Select <b>up to 3 drinkers</b> who finished. Tapping a group toggles selection. Click Done when finished.\n")
+    elif game_name == "Taste So Good - Guesser":
+        lines.append("Select <b>up to 14 guessers</b> who guessed correctly. Tapping a group toggles selection. Click Done when finished.\n")
     else:
         lines.append(f"Select all groups that won this round. Tapping a group toggles selection. Click <b>Done & Add +{pts} pts</b> when finished.\n")
 
@@ -461,9 +474,15 @@ async def cb_points_multi_done(callback: CallbackQuery, state: FSMContext) -> No
     if game_name == "Chubby Bunny (Mouth Volume)" and len(selected_group_ids) != 5:
         await callback.answer("Please select exactly 5 groups.", show_alert=True)
         return
+    if game_name == "Taste So Good - Drinker" and len(selected_group_ids) > 3:
+        await callback.answer("Please select up to 3 groups.", show_alert=True)
+        return
+    if game_name == "Taste So Good - Guesser" and len(selected_group_ids) > 14:
+        await callback.answer("Please select up to 14 groups.", show_alert=True)
+        return
 
     groups = await _load_groups()
-    pts = 300 if game_name == "Chubby Bunny (Mouth Volume)" else 100
+    pts = _get_pts_per_win(game_name)
     lines = [
         f"📋 <b>Confirm additions for: {game_name}</b>\n",
         f"The following groups will be added <b>+{pts} points</b>:\n"
@@ -496,13 +515,13 @@ def _get_game_unit(game_name: str) -> str:
 
 def _measurement_group_kb(
     groups: list[dict],
-    measurements: dict[int, float],
+    measurements: dict[str, float],
     unit: str,
 ) -> InlineKeyboardMarkup:
     """Group picker for measurement entry — shows each group name and their assigned measurement."""
     buttons = []
     for g in groups:
-        val = measurements.get(g["id"])
+        val = measurements.get(str(g["id"]))
         label = f"{g['name']} ({val} {unit})" if val is not None else f"{g['name']} (—)"
         buttons.append(InlineKeyboardButton(text=label, callback_data=f"ib:meas:grp:{g['id']}"))
 
@@ -522,7 +541,7 @@ async def _show_measurement_group_select(
 ) -> None:
     data = await state.get_data()
     game_name = data["game_name"]
-    measurements: dict[int, float] = data.get("measurements", {})
+    measurements: dict[str, float] = data.get("measurements", {})
     target_weight = data.get("target_weight")
     unit = _get_game_unit(game_name)
 
@@ -538,7 +557,7 @@ async def _show_measurement_group_select(
 
     has_meas = False
     for g in groups:
-        val = measurements.get(g["id"])
+        val = measurements.get(str(g["id"]))
         if val is not None:
             diff_str = ""
             if target_weight is not None:
@@ -974,9 +993,9 @@ async def cb_results_confirm(callback: CallbackQuery, state: FSMContext) -> None
             if scoring_type == "points":
                 scores: dict[int, int] = data["scores"]
 
-                if game_name in ("Chemistry Competition", "Scratch My Back", "Chubby Bunny (Mouth Volume)"):
+                if game_name in ("Chemistry Competition", "Scratch My Back", "Chubby Bunny (Mouth Volume)", "Taste So Good - Drinker", "Taste So Good - Guesser"):
                     selected_group_ids: list[int] = data["selected_group_ids"]
-                    pts = 300 if game_name == "Chubby Bunny (Mouth Volume)" else 100
+                    pts = _get_pts_per_win(game_name)
                     for gid in selected_group_ids:
                         scores[gid] = scores.get(gid, 0) + pts
                     await icebreaker.record_results(db, game_id, scores=scores)

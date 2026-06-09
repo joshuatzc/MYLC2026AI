@@ -249,6 +249,11 @@ async def seed(db: AsyncSession) -> None:
     # Pre-seed Ice Breaker Games
     # ------------------------------------------------------------------
     from app.models import IceBreakerGame
+    from sqlalchemy import delete
+    
+    # Cleanup old Taste So Good if it exists
+    await db.execute(delete(IceBreakerGame).where(IceBreakerGame.name == "Taste So Good"))
+
     ice_breaker_games = [
         ("Longest Pinky", "ranking"),
         ("Biggest Forehead", "ranking"),
@@ -259,7 +264,8 @@ async def seed(db: AsyncSession) -> None:
         ("Blind Karaoke", "points"),
         ("Chemistry Competition", "points"),
         ("Scratch My Back", "points"),
-        ("Taste So Good", "points"),
+        ("Taste So Good - Drinker", "points"),
+        ("Taste So Good - Guesser", "points"),
     ]
     for name, s_type in ice_breaker_games:
         res_game = await db.execute(select(IceBreakerGame).where(IceBreakerGame.name == name))

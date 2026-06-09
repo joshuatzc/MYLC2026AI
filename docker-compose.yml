@@ -55,6 +55,35 @@ services:
     depends_on:
       - mylc-bot
 
+  # ── Cloudflare Tunnel (Secure Public URL) ───────────────────────────────────
+  # Exposes the dashboard to the internet securely without port forwarding.
+  # Choose ONE of the following modes:
+  #
+  # MODE A: Quick Tunnel (No Cloudflare account needed. Generates a random public URL in logs).
+  # To view the URL, run: docker compose logs mylc-tunnel
+  mylc-tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: mylc-tunnel
+    restart: unless-stopped
+    command: tunnel --url http://mylc-bot:8000
+    depends_on:
+      - mylc-bot
+
+  # MODE B: Permanent Named Tunnel (Requires Cloudflare Zero Trust account + Domain).
+  # 1. Create a tunnel in the Cloudflare Zero Trust Dashboard.
+  # 2. Add CLOUDFLARE_TUNNEL_TOKEN=your_token in your .env file.
+  # 3. Comment out MODE A above, and uncomment MODE B below.
+  # mylc-tunnel-prod:
+  #   image: cloudflare/cloudflared:latest
+  #   container_name: mylc-tunnel-prod
+  #   restart: unless-stopped
+  #   environment:
+  #     - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+  #   command: tunnel run
+  #   depends_on:
+  #     - mylc-bot
+
 volumes:
   mylc_data:
     driver: local
+

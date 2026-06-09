@@ -1,4 +1,22 @@
-# ── Stage 1: Build dependencies ──────────────────────────────────────────────
+# ── Stage 1: Build React Frontend ─────────────────────────────────────────────
+FROM node:20-alpine AS frontend-builder
+
+WORKDIR /frontend
+
+# Copy dependencies lists
+COPY frontend/package*.json ./
+
+# Install dependencies
+RUN npm ci
+
+# Copy frontend source
+COPY frontend/ ./
+
+# Build the frontend assets to /frontend/dist
+RUN npm run build
+
+
+# ── Stage 2: Build Python dependencies ────────────────────────────────────────
 FROM python:3.11-slim AS builder
 
 WORKDIR /app
@@ -8,13 +26,16 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
 
-# ── Stage 2: Runtime image ────────────────────────────────────────────────────
+# ── Stage 3: Runtime image ────────────────────────────────────────────────────
 FROM python:3.11-slim
 
 WORKDIR /app
 
 # Copy installed packages from builder
 COPY --from=builder /install /usr/local
+
+# Copy built frontend assets to FastAPI static folder
+COPY --from=frontend-builder /frontend/dist ./app/static
 
 # Copy application source
 COPY app/ ./app/
@@ -24,7 +45,7 @@ COPY assets/ ./assets/
 # Data directory for persistent SQLite database (mount a volume here)
 RUN mkdir -p /data
 
-# Ensure all files are readable regardless of source permissions (e.g. OneDrive sync)
+# Ensure all files are readable regardless of source permissions
 RUN chmod -R 755 /app
 
 # Run as non-root for security
