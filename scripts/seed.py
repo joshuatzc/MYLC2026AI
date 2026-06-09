@@ -251,8 +251,11 @@ async def seed(db: AsyncSession) -> None:
     from app.models import IceBreakerGame
     ice_breaker_games = [
         ("Longest Pinky", "ranking"),
-        ("Chubby Bunny (Mouth Volume)", "ranking"),
+        ("Biggest Forehead", "ranking"),
+        ("Chubby Bunny (Mouth Volume)", "points"),
         ("Most 6/7", "ranking"),
+        ("Closest Weight", "ranking"),
+        ("Furthest Throw", "single"),
         ("Blind Karaoke", "points"),
         ("Chemistry Competition", "points"),
         ("Scratch My Back", "points"),
@@ -260,9 +263,14 @@ async def seed(db: AsyncSession) -> None:
     ]
     for name, s_type in ice_breaker_games:
         res_game = await db.execute(select(IceBreakerGame).where(IceBreakerGame.name == name))
-        if not res_game.scalar_one_or_none():
+        existing_game = res_game.scalar_one_or_none()
+        if not existing_game:
             db.add(IceBreakerGame(name=name, scoring_type=s_type))
             print(f"  ✚  Pre-seeded Ice Breaker Game: {name} ({s_type})")
+        else:
+            if existing_game.scoring_type != s_type:
+                existing_game.scoring_type = s_type
+                print(f"  ⚡ Updated Ice Breaker Game: {name} type to {s_type}")
 
     await db.commit()
 
