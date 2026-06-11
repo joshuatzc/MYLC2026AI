@@ -243,11 +243,14 @@ async def get_standings(db: AsyncSession) -> list[dict[str, Any]]:
     # Sort: highest points first, alphabetical on ties
     entries.sort(key=lambda e: (-e["total_points"], e["group_name"]))
 
-    # Assign ranks + bonuses
+    # Assign ranks + bonuses using standard competition ranking
+    current_rank = 1
     for rank_idx, entry in enumerate(entries):
-        rank = rank_idx + 1
-        entry["rank"] = rank
-        entry["starting_pop_bonus"] = _bonus_for_rank(rank)
+        if rank_idx > 0 and entry["total_points"] < entries[rank_idx - 1]["total_points"]:
+            current_rank = rank_idx + 1
+        
+        entry["rank"] = current_rank
+        entry["starting_pop_bonus"] = _bonus_for_rank(current_rank)
         entry["final_starting_pop"] = 10 + entry["starting_pop_bonus"]
 
     return entries
