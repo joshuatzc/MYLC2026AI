@@ -149,22 +149,41 @@ async def cb_main_menu(callback: CallbackQuery) -> None:
 # Help and Guides Handlers (Direct HTML Document Uploads)
 # ---------------------------------------------------------------------------
 
-@router.message(F.text == "📖 Help & Guides")
-@router.message(Command("help", "guides"))
-async def handle_help_guides(message: Message) -> None:
-    """Send both files when user taps the menu button or runs /help."""
+def _get_help_file_path(filename: str) -> str | None:
+    """Robustly find the help file path across Docker and local dev environments."""
     import os
-    from aiogram.types import FSInputFile
     
     _here = os.path.dirname(os.path.abspath(__file__))
     _project_root = os.path.abspath(os.path.join(_here, "..", "..", ".."))
     
-    bothelp_path = os.path.join(_project_root, "frontend", "public", "bothelp.html")
-    gamehelp_path = os.path.join(_project_root, "frontend", "public", "gamehelp.html")
+    candidates = [
+        # Path inside Docker runtime (where frontend/dist is built to app/static)
+        os.path.join(_project_root, "app", "static", filename),
+        # Path in local frontend public folder (before build)
+        os.path.join(_project_root, "frontend", "public", filename),
+        # Path in local frontend dist folder (after local build)
+        os.path.join(_project_root, "frontend", "dist", filename),
+    ]
+    
+    for path in candidates:
+        if os.path.exists(path):
+            return path
+            
+    return None
+
+
+@router.message(F.text == "📖 Help & Guides")
+@router.message(Command("help", "guides"))
+async def handle_help_guides(message: Message) -> None:
+    """Send both files when user taps the menu button or runs /help."""
+    from aiogram.types import FSInputFile
+    
+    bothelp_path = _get_help_file_path("bothelp.html")
+    gamehelp_path = _get_help_file_path("gamehelp.html")
     
     sent_any = False
     
-    if os.path.exists(bothelp_path):
+    if bothelp_path:
         await message.answer_document(
             document=FSInputFile(bothelp_path),
             caption="🤖 *Bot Help & Commands*\nHere is the guide for using the Telegram Bot.",
@@ -172,7 +191,7 @@ async def handle_help_guides(message: Message) -> None:
         )
         sent_any = True
         
-    if os.path.exists(gamehelp_path):
+    if gamehelp_path:
         await message.answer_document(
             document=FSInputFile(gamehelp_path),
             caption="🎮 *Game Guide & Rules*\nHere is the guide for the Church Game rules.",
@@ -187,15 +206,11 @@ async def handle_help_guides(message: Message) -> None:
 @router.message(Command("bothelp"))
 async def handle_bothelp_command(message: Message) -> None:
     """Send only bothelp.html."""
-    import os
     from aiogram.types import FSInputFile
     
-    _here = os.path.dirname(os.path.abspath(__file__))
-    _project_root = os.path.abspath(os.path.join(_here, "..", "..", ".."))
+    bothelp_path = _get_help_file_path("bothelp.html")
     
-    bothelp_path = os.path.join(_project_root, "frontend", "public", "bothelp.html")
-    
-    if os.path.exists(bothelp_path):
+    if bothelp_path:
         await message.answer_document(
             document=FSInputFile(bothelp_path),
             caption="🤖 *Bot Help & Commands*\nHere is the guide for using the Telegram Bot.",
@@ -208,15 +223,11 @@ async def handle_bothelp_command(message: Message) -> None:
 @router.message(Command("gamehelp"))
 async def handle_gamehelp_command(message: Message) -> None:
     """Send only gamehelp.html."""
-    import os
     from aiogram.types import FSInputFile
     
-    _here = os.path.dirname(os.path.abspath(__file__))
-    _project_root = os.path.abspath(os.path.join(_here, "..", "..", ".."))
+    gamehelp_path = _get_help_file_path("gamehelp.html")
     
-    gamehelp_path = os.path.join(_project_root, "frontend", "public", "gamehelp.html")
-    
-    if os.path.exists(gamehelp_path):
+    if gamehelp_path:
         await message.answer_document(
             document=FSInputFile(gamehelp_path),
             caption="🎮 *Game Guide & Rules*\nHere is the guide for the Church Game rules.",
