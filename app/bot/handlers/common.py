@@ -10,7 +10,6 @@ from aiogram.types import CallbackQuery, Message
 from app.bot.keyboards import (
     groups_inline_keyboard,
     main_menu_keyboard,
-    guides_keyboard,
 )
 from app.database import AsyncSessionLocal
 from app.services import auth, game_logic
@@ -147,76 +146,81 @@ async def cb_main_menu(callback: CallbackQuery) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Help and Guides Handlers
+# Help and Guides Handlers (Direct HTML Document Uploads)
 # ---------------------------------------------------------------------------
 
 @router.message(F.text == "📖 Help & Guides")
+@router.message(Command("help", "guides"))
 async def handle_help_guides(message: Message) -> None:
-    await message.answer(
-        "📖 *Help & Guides*\n\n"
-        "Choose which guide you would like to view:",
-        parse_mode="Markdown",
-        reply_markup=guides_keyboard(),
-    )
+    """Send both files when user taps the menu button or runs /help."""
+    import os
+    from aiogram.types import FSInputFile
+    
+    _here = os.path.dirname(os.path.abspath(__file__))
+    _project_root = os.path.abspath(os.path.join(_here, "..", "..", ".."))
+    
+    bothelp_path = os.path.join(_project_root, "frontend", "public", "bothelp.html")
+    gamehelp_path = os.path.join(_project_root, "frontend", "public", "gamehelp.html")
+    
+    sent_any = False
+    
+    if os.path.exists(bothelp_path):
+        await message.answer_document(
+            document=FSInputFile(bothelp_path),
+            caption="🤖 *Bot Help & Commands*\nHere is the guide for using the Telegram Bot.",
+            parse_mode="Markdown"
+        )
+        sent_any = True
+        
+    if os.path.exists(gamehelp_path):
+        await message.answer_document(
+            document=FSInputFile(gamehelp_path),
+            caption="🎮 *Game Guide & Rules*\nHere is the guide for the Church Game rules.",
+            parse_mode="Markdown"
+        )
+        sent_any = True
+        
+    if not sent_any:
+        await message.answer("⚠️ Help files were not found on the server.")
 
 
 @router.message(Command("bothelp"))
 async def handle_bothelp_command(message: Message) -> None:
-    from app.config import settings
-    from aiogram.types import WebAppInfo
-    from aiogram.utils.keyboard import InlineKeyboardBuilder
-
-    base_url = settings.BASE_URL.rstrip("/")
-    if not base_url:
-        await message.answer("⚠️ Bot Help is not configured by the administrator yet.")
-        return
-
-    builder = InlineKeyboardBuilder()
-    is_https = base_url.startswith("https://")
-    if is_https:
-        builder.button(text="🤖 Open Bot Help", web_app=WebAppInfo(url=f"{base_url}/bothelp.html"))
+    """Send only bothelp.html."""
+    import os
+    from aiogram.types import FSInputFile
+    
+    _here = os.path.dirname(os.path.abspath(__file__))
+    _project_root = os.path.abspath(os.path.join(_here, "..", "..", ".."))
+    
+    bothelp_path = os.path.join(_project_root, "frontend", "public", "bothelp.html")
+    
+    if os.path.exists(bothelp_path):
+        await message.answer_document(
+            document=FSInputFile(bothelp_path),
+            caption="🤖 *Bot Help & Commands*\nHere is the guide for using the Telegram Bot.",
+            parse_mode="Markdown"
+        )
     else:
-        builder.button(text="🤖 Open Bot Help", url=f"{base_url}/bothelp.html")
-
-    builder.adjust(1)
-    await message.answer(
-        "🤖 *Bot Help & Commands*\n\n"
-        "Click the button below to open the Bot Help guide:",
-        parse_mode="Markdown",
-        reply_markup=builder.as_markup(),
-    )
+        await message.answer("⚠️ Bot Help file was not found on the server.")
 
 
 @router.message(Command("gamehelp"))
 async def handle_gamehelp_command(message: Message) -> None:
-    from app.config import settings
-    from aiogram.types import WebAppInfo
-    from aiogram.utils.keyboard import InlineKeyboardBuilder
-
-    base_url = settings.BASE_URL.rstrip("/")
-    if not base_url:
-        await message.answer("⚠️ Game Guide is not configured by the administrator yet.")
-        return
-
-    builder = InlineKeyboardBuilder()
-    is_https = base_url.startswith("https://")
-    if is_https:
-        builder.button(text="🎮 Open Game Help", web_app=WebAppInfo(url=f"{base_url}/gamehelp.html"))
+    """Send only gamehelp.html."""
+    import os
+    from aiogram.types import FSInputFile
+    
+    _here = os.path.dirname(os.path.abspath(__file__))
+    _project_root = os.path.abspath(os.path.join(_here, "..", "..", ".."))
+    
+    gamehelp_path = os.path.join(_project_root, "frontend", "public", "gamehelp.html")
+    
+    if os.path.exists(gamehelp_path):
+        await message.answer_document(
+            document=FSInputFile(gamehelp_path),
+            caption="🎮 *Game Guide & Rules*\nHere is the guide for the Church Game rules.",
+            parse_mode="Markdown"
+        )
     else:
-        builder.button(text="🎮 Open Game Help", url=f"{base_url}/gamehelp.html")
-
-    builder.adjust(1)
-    await message.answer(
-        "🎮 *Game Guide & Rules*\n\n"
-        "Click the button below to open the Game Help guide:",
-        parse_mode="Markdown",
-        reply_markup=builder.as_markup(),
-    )
-
-
-@router.callback_query(F.data == "guide_not_configured")
-async def cb_guide_not_configured(callback: CallbackQuery) -> None:
-    await callback.answer(
-        "⚠️ The bot administrator has not configured the BASE_URL setting in the .env file yet.",
-        show_alert=True
-    )
+        await message.answer("⚠️ Game Guide file was not found on the server.")

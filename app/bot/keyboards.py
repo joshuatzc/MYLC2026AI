@@ -8,11 +8,8 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     KeyboardButton,
     ReplyKeyboardMarkup,
-    WebAppInfo,
 )
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-
-from app.config import settings
 
 
 # ---------------------------------------------------------------------------
@@ -32,45 +29,6 @@ def main_menu_keyboard(role: str = "normal") -> ReplyKeyboardMarkup:
         rows[-1].append(KeyboardButton(text="👑 Become Leader"))
 
     return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
-
-
-def guides_keyboard() -> InlineKeyboardMarkup:
-    """Build the inline keyboard to open Game Help and Bot Help."""
-    builder = InlineKeyboardBuilder()
-    base_url = settings.BASE_URL.rstrip("/")
-    
-    if base_url:
-        is_https = base_url.startswith("https://")
-        
-        if is_https:
-            # Premium WebApp experience
-            builder.button(
-                text="🤖 Bot Help",
-                web_app=WebAppInfo(url=f"{base_url}/bothelp.html")
-            )
-            builder.button(
-                text="🎮 Game Help",
-                web_app=WebAppInfo(url=f"{base_url}/gamehelp.html")
-            )
-        else:
-            # Fallback to standard URL links if not HTTPS (localhost / testing)
-            builder.button(
-                text="🤖 Bot Help",
-                url=f"{base_url}/bothelp.html"
-            )
-            builder.button(
-                text="🎮 Game Help",
-                url=f"{base_url}/gamehelp.html"
-            )
-    else:
-        # Configuration warning
-        builder.button(
-            text="⚠️ Help URLs not configured",
-            callback_data="guide_not_configured"
-        )
-        
-    builder.adjust(1)
-    return builder.as_markup()
 
 
 # ---------------------------------------------------------------------------
