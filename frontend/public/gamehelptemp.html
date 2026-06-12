@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🎮 Game Guide & Rules</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-color: #0b0f19;
+      --card-bg: rgba(255, 255, 255, 0.03);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --text-primary: #f3f4f6;
+      --text-secondary: #9ca3af;
+      --primary: #f59e0b;
+      --primary-glow: rgba(245, 158, 11, 0.12);
+      --accent: #ef4444;
+      --accent-glow: rgba(239, 68, 68, 0.12);
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-primary);
+      line-height: 1.5;
+      padding: 16px;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    /* Gradient Background Effect */
+    body::before {
+      content: '';
+      position: fixed;
+      top: -10%;
+      left: -10%;
+      width: 120%;
+      height: 60%;
+      background: radial-gradient(circle, var(--primary-glow) 0%, rgba(11, 15, 25, 0) 70%);
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    body::after {
+      content: '';
+      position: fixed;
+      bottom: -10%;
+      right: -10%;
+      width: 120%;
+      height: 60%;
+      background: radial-gradient(circle, var(--accent-glow) 0%, rgba(11, 15, 25, 0) 70%);
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 24px;
+      padding-top: 12px;
+    }
+
+    .logo-container {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 64px;
+      height: 64px;
+      border-radius: 20px;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      box-shadow: 0 8px 20px rgba(245, 158, 11, 0.3);
+      margin-bottom: 12px;
+      font-size: 32px;
+      animation: float 4s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, #fff 40%, var(--primary) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 6px;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: var(--text-secondary);
+      font-weight: 400;
+    }
+
+    .section-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin: 24px 0 12px 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .section-title::after {
+      content: '';
+      flex-grow: 1;
+      height: 1px;
+      background: linear-gradient(90deg, var(--card-border), transparent);
+    }
+
+    .card {
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+
+    .rule-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--primary);
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .rule-desc {
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .rule-desc strong {
+      color: var(--text-primary);
+    }
+
+    .gameplay-loop {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .loop-step {
+      position: relative;
+      padding-left: 32px;
+    }
+
+    .loop-step::before {
+      content: '';
+      position: absolute;
+      left: 10px;
+      top: 24px;
+      bottom: -16px;
+      width: 2px;
+      background: var(--card-border);
+    }
+
+    .loop-step:last-child::before {
+      display: none;
+    }
+
+    .loop-icon {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: rgba(245, 158, 11, 0.1);
+      border: 1px solid rgba(245, 158, 11, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      color: var(--primary);
+    }
+
+    .loop-content h3 {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .loop-content p {
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo-container">⛪</div>
+      <h1>Game Guide & Rules</h1>
+      <p class="subtitle">Welcome to Build the Biggest Church — MYLC 2026</p>
+    </header>
+
+    <h2 class="section-title">Objective</h2>
+    <div class="card">
+      <p class="rule-desc">
+        Your goal is to cooperate with your team to <strong>grow your church population</strong> to be the largest by the end of the game. Grow your church by unlocking levels at different stations.
+      </p>
+    </div>
+
+    <h2 class="section-title">Core Gameplay Loop</h2>
+    <div class="card">
+      <div class="gameplay-loop">
+        <div class="loop-step">
+          <span class="loop-icon">📍</span>
+          <div class="loop-content">
+            <h3>Visit Stations</h3>
+            <p>Travel with your team to various gameplay stations in the venue. Each station has a specific theme and upgrade requirements.</p>
+          </div>
+        </div>
+
+        <div class="loop-step">
+          <span class="loop-icon">🧩</span>
+          <div class="loop-content">
+            <h3>Solve Challenges & Hints</h3>
+            <p>Complete challenges at stations to unlock hints and verify your prerequisites. You can purchase hints using a percentage of your church population.</p>
+          </div>
+        </div>
+
+        <div class="loop-step">
+          <span class="loop-icon">⬆️</span>
+          <div class="loop-content">
+            <h3>Upgrade Church Levels</h3>
+            <p>Once you meet all requirements, the Group Leader can register a Level Upgrade at the station, permanently boosting your overall population.</p>
+          </div>
+        </div>
+
+        <div class="loop-step">
+          <span class="loop-icon">⚡</span>
+          <div class="loop-content">
+            <h3>Theft & Sabotage</h3>
+            <p>Watch out! Upgrades can unlock theft options that let you steal populations from rival churches, turning the tide of the competition.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <h2 class="section-title">Key Rules</h2>
+    
+    <div class="card">
+      <h3 class="rule-title">🔑 Station Prerequisites</h3>
+      <p class="rule-desc">
+        You cannot upgrade a level unless you have completed the prerequisite levels from other stations. Check your status using <code>📋 Check Prerequisites</code> in the bot!
+      </p>
+    </div>
+
+    <div class="card">
+      <h3 class="rule-title">👑 Leader Authorization</h3>
+      <p class="rule-desc">
+        Only the authorized <strong>Group Leader</strong> can trigger actions like church level upgrades, purchasing hints, or executing theft. Coordinate with your leader before making key moves.
+      </p>
+    </div>
+  </div>
+</body>
+</html>

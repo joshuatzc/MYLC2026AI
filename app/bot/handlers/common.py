@@ -4,10 +4,14 @@ bot/handlers/common.py – /start, main menu redraw, Change Group flow.
 from __future__ import annotations
 
 from aiogram import F, Router
-from aiogram.filters import CommandStart
+from aiogram.filters import Command, CommandStart
 from aiogram.types import CallbackQuery, Message
 
-from app.bot.keyboards import groups_inline_keyboard, main_menu_keyboard
+from app.bot.keyboards import (
+    groups_inline_keyboard,
+    main_menu_keyboard,
+    guides_keyboard,
+)
 from app.database import AsyncSessionLocal
 from app.services import auth, game_logic
 
@@ -140,3 +144,79 @@ async def cb_main_menu(callback: CallbackQuery) -> None:
     await callback.message.edit_text("Returning to main menu…")
     await callback.message.answer("Main Menu", reply_markup=main_menu_keyboard(role))
     await callback.answer()
+
+
+# ---------------------------------------------------------------------------
+# Help and Guides Handlers
+# ---------------------------------------------------------------------------
+
+@router.message(F.text == "📖 Help & Guides")
+async def handle_help_guides(message: Message) -> None:
+    await message.answer(
+        "📖 *Help & Guides*\n\n"
+        "Choose which guide you would like to view:",
+        parse_mode="Markdown",
+        reply_markup=guides_keyboard(),
+    )
+
+
+@router.message(Command("bothelp"))
+async def handle_bothelp_command(message: Message) -> None:
+    from app.config import settings
+    from aiogram.types import WebAppInfo
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+    base_url = settings.BASE_URL.rstrip("/")
+    if not base_url:
+        await message.answer("⚠️ Bot Help is not configured by the administrator yet.")
+        return
+
+    builder = InlineKeyboardBuilder()
+    is_https = base_url.startswith("https://")
+    if is_https:
+        builder.button(text="🤖 Open Bot Help", web_app=WebAppInfo(url=f"{base_url}/bothelp.html"))
+    else:
+        builder.button(text="🤖 Open Bot Help", url=f"{base_url}/bothelp.html")
+
+    builder.adjust(1)
+    await message.answer(
+        "🤖 *Bot Help & Commands*\n\n"
+        "Click the button below to open the Bot Help guide:",
+        parse_mode="Markdown",
+        reply_markup=builder.as_markup(),
+    )
+
+
+@router.message(Command("gamehelp"))
+async def handle_gamehelp_command(message: Message) -> None:
+    from app.config import settings
+    from aiogram.types import WebAppInfo
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+    base_url = settings.BASE_URL.rstrip("/")
+    if not base_url:
+        await message.answer("⚠️ Game Guide is not configured by the administrator yet.")
+        return
+
+    builder = InlineKeyboardBuilder()
+    is_https = base_url.startswith("https://")
+    if is_https:
+        builder.button(text="🎮 Open Game Help", web_app=WebAppInfo(url=f"{base_url}/gamehelp.html"))
+    else:
+        builder.button(text="🎮 Open Game Help", url=f"{base_url}/gamehelp.html")
+
+    builder.adjust(1)
+    await message.answer(
+        "🎮 *Game Guide & Rules*\n\n"
+        "Click the button below to open the Game Help guide:",
+        parse_mode="Markdown",
+        reply_markup=builder.as_markup(),
+    )
+
+
+@router.callback_query(F.data == "guide_not_configured")
+async def cb_guide_not_configured(callback: CallbackQuery) -> None:
+    await callback.answer(
+        "⚠️ The bot administrator has not configured the BASE_URL setting in the .env file yet.",
+        show_alert=True
+    )

@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<!-- @dsCard group="Brand" name="Game Explainer" subtitle="One-page infographic — full game explained" --><html lang="en"><head>
+
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Build the Biggest Church — How to Play (MYLC 2026)</title>
+<style>
+  :root{
+    --gold:#c08a2d; --gold-deep:#9a6c1d; --gold-soft:#e8c879;
+    --ink:#1b2a39; --ink-soft:#3a4a5c; --muted:#6b7886;
+    --cream:#f6f1e7; --paper:#fffdf8; --line:#e6dcc6;
+    --green:#2f9e44; --green-soft:#e4f3e7;
+    --red:#cf4233; --red-soft:#f7e2de;
+    --amber:#c98a17; --amber-soft:#f7ecd0;
+    --blue:#2f6db0; --blue-soft:#e3edf7;
+    --serif:"Iowan Old Style","Palatino Linotype","Georgia",serif;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono:"SF Mono",ui-monospace,Menlo,"Roboto Mono",monospace;
+  }
+  *{box-sizing:border-box;}
+  html{ -webkit-text-size-adjust:100%; }
+  body{
+    margin:0; background:
+      radial-gradient(900px 500px at 80% -5%, #efe7d4, transparent 60%),
+      radial-gradient(800px 600px at -10% 30%, #efe8d6, transparent 55%),
+      var(--cream);
+    color:var(--ink); font-family:var(--sans);
+    -webkit-font-smoothing:antialiased; line-height:1.5;
+  }
+  .sheet{ max-width:760px; margin:0 auto; padding:0 22px 64px; }
+
+  /* ---- shared bits ---- */
+  .eyebrow{ font-size:12px; font-weight:700; letter-spacing:.2em; text-transform:uppercase; color:var(--gold-deep); }
+  h2.section{ font-family:var(--serif); font-weight:700; font-size:27px; margin:8px 0 0; letter-spacing:-.01em; }
+  .sec-rule{ height:2px; background:linear-gradient(90deg,var(--gold),transparent); border:0; margin:14px 0 22px; }
+  .lead{ color:var(--ink-soft); font-size:16px; margin:6px 0 0; }
+  .lead b{ color:var(--ink); }
+  section{ margin-top:48px; }
+  .pill{ display:inline-flex; align-items:center; gap:5px; font-family:var(--mono); font-weight:600; font-size:12px; padding:3px 9px; border-radius:999px; white-space:nowrap; }
+  .pill.g{ background:var(--green-soft); color:var(--green); }
+  .pill.a{ background:var(--amber-soft); color:var(--amber); }
+  .pill.r{ background:var(--red-soft); color:var(--red); }
+  .pill.gold{ background:#f3e6c6; color:var(--gold-deep); }
+  .pill.blue{ background:var(--blue-soft); color:var(--blue); }
+
+  /* ---- HERO ---- */
+  header.hero{
+    text-align:center; padding:48px 0 26px;
+    border-bottom:1px solid var(--line);
+  }
+  .crest{
+    width:88px; height:88px; border-radius:50%; margin:0 auto 20px;
+    display:grid; place-items:center; font-size:46px;
+    background:linear-gradient(160deg,var(--gold-soft),var(--gold-deep));
+    box-shadow:0 10px 26px rgba(154,108,29,.35), inset 0 2px 6px rgba(255,255,255,.4);
+  }
+  .hero .eyebrow{ display:block; }
+  h1{
+    font-family:var(--serif); font-weight:700; font-size:42px; line-height:1.04;
+    margin:12px 0 0; letter-spacing:-.02em;
+  }
+  .hero .tag{ font-size:17px; color:var(--ink-soft); margin:16px auto 0; }
+  .hero .meta{ display:flex; gap:9px; flex-wrap:wrap; justify-content:center; margin-top:22px; }
+  .chip{ font-size:13px; font-weight:600; color:var(--ink); background:var(--paper); border:1px solid var(--line); border-radius:999px; padding:8px 15px; display:inline-flex; gap:7px; align-items:center; }
+
+  /* ---- GOAL strip ---- */
+  .goal{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:24px; }
+  .stat{ background:var(--paper); border:1px solid var(--line); border-radius:16px; padding:20px 18px; }
+  .stat .big{ font-family:var(--serif); font-weight:700; font-size:32px; color:var(--gold-deep); line-height:1; }
+  .stat .lbl{ font-weight:700; font-size:14px; margin-top:10px; }
+  .stat .desc{ color:var(--muted); font-size:13.5px; margin-top:4px; }
+
+  /* ---- STARTING SIZE (icebreaker rank) ---- */
+  .starts{ display:grid; grid-template-columns:repeat(3,1fr); gap:14px; align-items:end; }
+  .start{ background:var(--paper); border:1px solid var(--line); border-radius:16px; padding:16px 16px 18px; text-align:center; }
+  .start.win{ border-color:var(--gold-soft); box-shadow:0 6px 20px rgba(154,108,29,.12); }
+  .start .illo{ height:120px; display:flex; align-items:flex-end; justify-content:center; overflow:hidden; }
+  .start .illo svg{ height:100%; width:auto; max-width:100%; display:block; }
+  .start .rank{ font-family:var(--mono); font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--gold-deep); margin:12px 0 4px; display:flex; align-items:center; justify-content:center; gap:6px; }
+  .start .rank .m{ font-family:var(--sans); font-size:17px; }
+  .start .cap{ font-size:13.5px; color:var(--ink-soft); }
+  .start .cap b{ color:var(--ink); }
+
+  /* ---- STATION NAMES ---- */
+  .snames{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+  .sname{ background:var(--paper); border:1px solid var(--line); border-radius:14px; padding:18px 12px; display:flex; flex-direction:column; align-items:center; gap:9px; text-align:center; }
+  .sname .ico{ font-size:30px; line-height:1; }
+  .sname .nm{ font-family:var(--serif); font-weight:700; font-size:16px; color:var(--ink); line-height:1.15; }
+  .plus-one{ margin-top:14px; background:#fbf4e2; border:1px dashed var(--line); border-radius:12px; padding:13px 16px; font-size:14.5px; color:var(--ink-soft); }
+  .plus-one b{ color:var(--ink); }
+
+  /* ---- LEVEL LADDER ---- */
+  .ladder{ display:flex; align-items:stretch; gap:0; flex-wrap:nowrap; }
+  .ladder .lvl-card{ flex:1; background:var(--paper); border:1px solid var(--line); border-radius:16px; padding:20px 16px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:9px; }
+  .ladder .lvn{ font-family:var(--mono); font-size:12px; font-weight:700; color:var(--gold-deep); letter-spacing:.08em; }
+  .ladder .lvl-card .nm{ font-family:var(--serif); font-weight:700; font-size:21px; color:var(--ink); line-height:1; }
+  .ladder .lvl-card .ds{ font-size:13.5px; color:var(--ink-soft); }
+  .ladder .arrow{ flex:0 0 56px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; color:var(--gold-deep); }
+  .ladder .arrow svg{ display:block; }
+  .ladder .arrow .cap{ font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; }
+
+  /* ---- REWARD PERCENTAGES ---- */
+  .rewards{ display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+  .reward{ background:var(--paper); border:1px solid var(--line); border-radius:16px; padding:22px 18px; text-align:center; }
+  .reward .lvn{ font-family:var(--mono); font-size:11px; font-weight:700; color:var(--muted); letter-spacing:.08em; }
+  .reward .pct{ font-family:var(--serif); font-weight:700; font-size:42px; margin:8px 0 6px; line-height:1; }
+  .reward.l1 .pct{ color:var(--green); }
+  .reward.l2 .pct{ color:var(--amber); }
+  .reward.l3 .pct{ color:var(--gold-deep); }
+  .reward .ds{ font-size:13.5px; color:var(--ink-soft); }
+
+  .note{ margin-top:16px; background:#fbf4e2; border:1px dashed var(--line); border-radius:12px; padding:14px 16px; font-size:14.5px; color:var(--ink-soft); }
+  .note b{ color:var(--ink); }
+
+  /* ---- TIERS ---- */
+  .tiers{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; align-items:end; }
+  .tier{ background:var(--paper); border:1px solid var(--line); border-radius:16px; padding:18px 16px; position:relative; text-align:center; }
+  .tier .lvl{ font-family:var(--mono); font-size:11px; color:var(--muted); font-weight:700; }
+  .tier .nm{ font-family:var(--serif); font-weight:700; font-size:19px; margin:6px 0 12px; color:var(--gold-deep); }
+  .tier .kv{ display:flex; justify-content:center; gap:8px; font-size:13px; padding:5px 0; border-top:1px dashed #efe6d2; }
+  .tier .kv:first-of-type{ border-top:0; }
+  .tier .kv .k{ color:var(--muted); }
+  .tier .kv .v{ font-weight:700; font-family:var(--mono); }
+  .tier .barcap{ height:6px; border-radius:6px; background:linear-gradient(90deg,var(--gold-soft),var(--gold-deep)); margin:0 auto 12px; }
+  .tier.t0 .barcap{ width:18%; } .tier.t1 .barcap{ width:45%; }
+  .tier.t2 .barcap{ width:72%; } .tier.t3 .barcap{ width:100%; }
+  .tier-illo{ height:96px; display:flex; align-items:flex-end; justify-content:center; margin-bottom:6px; }
+  .tier-illo svg{ display:block; }
+
+  /* ---- HINTS + SAFETY ---- */
+  .two{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .card{ background:var(--paper); border:1px solid var(--line); border-radius:16px; padding:22px 22px; }
+  .card h3{ font-family:var(--serif); font-size:20px; margin:0 0 6px; display:flex; gap:9px; align-items:center; }
+  .card p{ color:var(--ink-soft); font-size:14.5px; margin:8px 0 0; }
+  .card .barline{ font-family:var(--mono); font-size:14px; color:var(--gold-deep); letter-spacing:1px; margin-top:12px; }
+
+  /* ---- LOOP (how it works) ---- */
+  .loop{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; align-items:stretch; }
+  .step{ position:relative; background:var(--paper); border:1px solid var(--line); border-radius:16px; padding:20px 16px; }
+  .step .n{ font-family:var(--mono); font-size:12px; font-weight:700; color:#fff; background:var(--ink); width:24px; height:24px; border-radius:50%; display:grid; place-items:center; }
+  .step .ti{ font-weight:700; font-size:15px; margin:12px 0 5px; }
+  .step .tx{ color:var(--ink-soft); font-size:13.5px; }
+  .step .em{ position:absolute; top:16px; right:16px; font-size:22px; }
+
+  /* ---- VENUE MAP ---- */
+  .venue{ background:var(--paper); border:1px solid var(--line); border-radius:18px; padding:16px; }
+  .venue svg{ width:100%; height:auto; display:block; }
+  .station-key{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px 16px; margin-top:16px; }
+  .station-key .sk{ display:flex; align-items:center; gap:10px; font-size:15px; color:var(--ink); line-height:1.2; }
+  .station-key .sk b{ flex:0 0 auto; width:26px; height:26px; border-radius:50%; background:var(--gold); color:#fff; font-family:var(--mono); font-weight:700; font-size:14px; display:grid; place-items:center; }
+  @media (min-width:681px){ .station-key{ grid-template-columns:repeat(4,1fr); } }
+  .venue-legend{ display:flex; gap:10px 18px; flex-wrap:wrap; margin-top:14px; font-size:12.5px; color:var(--ink-soft); }
+  .venue-legend span{ display:inline-flex; align-items:center; gap:8px; }
+  .venue-legend i{ width:16px; height:12px; border-radius:3px; display:inline-block; }
+
+  /* ---- EVENTS ---- */
+  .ev{ background:var(--paper); border:1px solid var(--line); border-left-width:5px; border-left-color:var(--blue); border-radius:14px; padding:20px 22px; }
+  .ev .eh{ display:flex; align-items:center; gap:10px; }
+  .ev .eh .e{ font-size:26px; }
+  .ev .eh .t{ font-family:var(--serif); font-weight:700; font-size:20px; }
+  .ev .tx{ color:var(--ink-soft); font-size:15px; margin-top:10px; }
+  .ev .tx b{ color:var(--ink); }
+
+  /* ---- NEWS flavor ---- */
+  .news{ background:var(--ink); color:#eaf0f5; border-radius:18px; padding:26px 28px; display:flex; gap:20px; align-items:center; }
+  .news .radio{ font-size:40px; }
+  .news .eyebrow{ color:var(--gold-soft); }
+  .news h3{ font-family:var(--serif); font-size:22px; margin:6px 0 8px; color:#fff; }
+  .news p{ margin:0; font-size:14.5px; color:#b7c4d0; }
+
+  /* ---- FOOTER ---- */
+  footer{ margin-top:54px; padding-top:22px; border-top:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; gap:14px; flex-wrap:wrap; color:var(--muted); font-size:12.5px; }
+  footer .ft-mark{ display:flex; align-items:center; gap:10px; color:var(--ink); font-weight:700; }
+  footer .ft-mark .c{ width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:16px;background:linear-gradient(160deg,var(--gold-soft),var(--gold-deep)); }
+
+  /* ===== PHONE-FIRST: this sheet is read mostly on phones ===== */
+  @media (max-width:680px){
+    h1{ font-size:36px; }
+    h2.section{ font-size:24px; }
+    .goal,.loop,.two,.tiers,.starts{ grid-template-columns:1fr; }
+    .goal{ gap:10px; }
+    .snames{ grid-template-columns:1fr 1fr; }
+    .rewards{ grid-template-columns:1fr; }
+    .ladder{ flex-direction:column; }
+    .ladder .arrow{ flex-basis:auto; padding:6px 0; }
+    .ladder .arrow svg{ transform:rotate(90deg); }
+    .news{ flex-direction:column; text-align:center; gap:14px; padding:24px 22px; }
+  }
+  @media print{
+    body{ background:var(--cream); -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .tier,.ev,.card,.step,.stat,.sname{ box-shadow:none; }
+    section{ break-inside:avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <!-- ===================== HERO ===================== -->
+  <header class="hero">
+    <div class="crest">⛪</div>
+    <span class="eyebrow">MYLC 2026</span>
+    <h1>Church Pte Ltd.</h1>
+    <p class="tag">Fourteen MYLC groups race to grow the largest congregation. Complete church upgrades and watch your church rise from a tiny home gathering to a legendary Giga Church.</p>
+    <div class="meta">
+      <span class="chip">📅 Sat 13 June 2026 · 8–10pm</span>
+      <span class="chip">👥 14 groups → ⛪️ 14 churches</span>
+    </div>
+  </header>
+
+  <!-- ===== 1 · STARTING POPULATION (icebreaker rank) ===== -->
+  <section>
+    <span class="eyebrow">Where You Begin</span>
+    <h2 class="section">Your Home Church starts as big as you earned</h2>
+    <hr class="sec-rule">
+    <p class="lead">There's only one thing to grow: your congregation size. But not everyone starts at the same level. Your performance on the icebreakers on day 1 sets the size of your starting Home Church: place higher, and you begin with a bigger congregation. From there, all 14 groups race to grow the largest church by the final whistle.</p>
+
+    <div class="starts">
+      <!-- LOWER -->
+      <div class="start">
+        <div class="illo">
+          <svg viewBox="0 0 200 150" role="img" aria-label="Home church with a small handful of people gathered.">
+            <line x1="30" y1="138" x2="170" y2="138" stroke="#e6dcc6" stroke-width="2" stroke-linecap="round"></line>
+            <line x1="100" y1="20" x2="100" y2="40" stroke="#c08a2d" stroke-width="3"></line>
+            <line x1="91" y1="28" x2="109" y2="28" stroke="#c08a2d" stroke-width="3"></line>
+            <polygon points="68,72 100,40 132,72" fill="#c08a2d"></polygon>
+            <rect x="76" y="72" width="48" height="42" fill="#1b2a39"></rect>
+            <circle cx="100" cy="60" r="4" fill="#e8c879"></circle>
+            <rect x="91" y="90" width="18" height="24" rx="2" fill="#e8c879"></rect>
+            <g transform="translate(88,135)"><circle cx="0" cy="-10" r="3.2" fill="#3a4a5c"></circle><path d="M0,-5 C3.2,-5 4.6,-1 4.6,6 L-4.6,6 C-4.6,-1 -3.2,-5 0,-5 Z" fill="#3a4a5c"></path></g>
+            <g transform="translate(112,135)"><circle cx="0" cy="-10" r="3.2" fill="#9a6c1d"></circle><path d="M0,-5 C3.2,-5 4.6,-1 4.6,6 L-4.6,6 C-4.6,-1 -3.2,-5 0,-5 Z" fill="#9a6c1d"></path></g>
+          </svg>
+        </div>
+        <div class="rank"><span class="m">🥉</span> Lower down</div>
+        <div class="cap">A smaller Home Church but plenty of room to grow.</div>
+      </div>
+
+      <!-- MIDDLE -->
+      <div class="start">
+        <div class="illo">
+          <svg viewBox="0 0 200 150" role="img" aria-label="Home church with a modest group of people gathered.">
+            <line x1="30" y1="138" x2="170" y2="138" stroke="#e6dcc6" stroke-width="2" stroke-linecap="round"></line>
+            <line x1="100" y1="20" x2="100" y2="40" stroke="#c08a2d" stroke-width="3"></line>
+            <line x1="91" y1="28" x2="109" y2="28" stroke="#c08a2d" stroke-width="3"></line>
+            <polygon points="68,72 100,40 132,72" fill="#c08a2d"></polygon>
+            <rect x="76" y="72" width="48" height="42" fill="#1b2a39"></rect>
+            <circle cx="100" cy="60" r="4" fill="#e8c879"></circle>
+            <rect x="91" y="90" width="18" height="24" rx="2" fill="#e8c879"></rect>
+            <g transform="translate(100,126) scale(.8)"><circle cx="0" cy="-10" r="3.2" fill="#6b7886"></circle><path d="M0,-5 C3.2,-5 4.6,-1 4.6,6 L-4.6,6 C-4.6,-1 -3.2,-5 0,-5 Z" fill="#6b7886"></path></g>
+            <g transform="translate(66,135)"><circle cx="0" cy="-10" r="3.2" fill="#3a4a5c"></circle><path d="M0,-5 C3.2,-5 4.6,-1 4.6,6 L-4.6,6 C-4.6,-1 -3.2,-5 0,-5 Z" fill="#3a4a5c"></path></g>
+            <g transform="translate(88,135)"><circle cx="0" cy="-10" r="3.2" fill="#9a6c1d"></circle><path d="M0,-5 C3.2,-5 4.6,-1 4.6,6 L-4.6,6 C-4.6,-1 -3.2,-5 0,-5 Z" fill="#9a6c1d"></path></g>
+            <g transform="translate(112,135)"><circle cx="0" cy="-10" r="3.2" fill="#2f4256"></circle><path d="M0,-5 C3.2,-5 4.6,-1 4.6,6 L-4.6,6 C-4.6,-1 -3.2,-5 0,-5 Z" fill="#2f4256"></path></g>
+            <g transform="translate(134,135)"><circle cx="0" cy="-10" r="3.2" fill="#3a4a5c"></circle><path d="M0,-5 C3.2,-5 4.6,-1 4.6,6 L-4.6,6 C-4.6,-1 -3.2,-5 0,-5 Z" fill="#3a4a5c"></path></g>
+          </svg>
+        </div>
+        <div class="rank"><span class="m">🥈</span> Middle of the pack</div>
+        <div class="cap">A <b>solid</b> little congregation to build on.</div>
+      </div>
+
+      <!-- TOP -->
+      <div class="start win">
+        <div class="illo">
+          <svg viewBox="0 0 200 150" role="img" aria-label="Home church surrounded by a large crowd of people.">
+            <line x1="22" y1="138" x2="178" y2="138" stroke="#e6dcc6" stroke-width="2" stroke-linecap="round"></line>
+            <line x1="100" y1="20" x2="100" y2="40" stroke="#c08a2d" stroke-width="3"></line>
+            <line x1="91" y1="28" x2="109" y2="28" stroke="#c08a2d" stroke-width="3"></line>
+            <polygon points="68,72 100,40 132,72" fill="#c08a2d"></polygon>
+            <rect x="76" y="72" width="48" height="42" fill="#1b2a39"></rect>
+            <circle cx="100" cy="60" r="4" fill="#e8c879"></circle>
+            <rect x="91" y="90" width="18" height="24" rx="2" fill="#e8c879"></rect>
+            <!-- back row -->
+            <g transform="translate(50,126) scale(.8)"><circle cx="0" cy="-10" r="3.2" fill="#6b7886"></circle><path d="M0,-5 C3.2,-5 4.6,-1 4.6,6 L-4.6,6 C-4.6,-1 -3.2,-5 0,-5 Z" fill="#6b7886"></path></g>
+            <g transform="translate(68,126) scale(.8)"><circle cx="0" cy="-10" r="3.2" fill="#7a8794"></circle><path d="M0,-5 C3.2,-5 4.6,-1 4.6,6 L-4.6,6 C-4.6,-1 -3.2,-5 0,-5 Z" fill="#7a8794"></path></g>
+            <g transform="translate(86,126) scale(.8)"><circle cx="0" cy="-10" r="3.2" fill="#6b7886"></circle><path d="M0,-5 C3.2,-5 4.6,-1 4.6,6 L-4.6,6 C-4.6,-1 -3.2,-5 0,-5 Z" fill="#6b7886"></path></g>
+            <g transform="translate(114,126) scale(.8)"><circle cx="0" cy="-10" r="3.2" fill="#7a8794"></circle><path d="M0,-5 C3.2,-5 4.6,-1 4.6,6 L-4.6,6 C-4.6,-1 -3.2,-5 0,-5 Z" fill="#7a8794"></path></g>
+            <g transform="translate(132,126) scale(.8)"><circle cx="0" cy="-10" r="3.2" fill="#6b7886"></circle><path d="M0,-5 C3.2,-5 4.6,-1 4.6,6 L-4.6,6 C-4.6,-1 -3.2,-5 0,-5 Z" fill="#6b7886"></path></g>
+            <g transform="translate(150,126) scale(.8)"><circle cx="0" cy="-10" r="3.2" fill="#7a8794"></circle><path d="M0,-5 C3.2,-5 4.6,-1 4.6,6 L-4.6,6 C-4.6,-1 -3.2,-5 0,-5 Z" fill="#7a8794"></path></g>
+            <!-- front row -->
+            <g transform="translate(44,135)"><circle cx="0" cy="-10" r="3.2" fill="#3a4a5c"></circle><path d="M0,-5 C3.2,-5 4.6,-1 4.6,6 L-4.6,6 C-4.6,-1 -3.2,-5 0,-5 Z" fill="#3a4a5c"></path></g>
+            <g transform="translate(61,135)"><circle cx="0" cy="-10" r="3.2" fill="#9a6c1d"></circle><path d="M0,-5 C3.2,-5 4.6,-1 4.6,6 L-4.6,6 C-4.6,-1 -3.2,-5 0,-5 Z" fill="#9a6c1d"></path></g>
+            <g transform="translate(78,135)"><circle cx="0" cy="-10" r="3.2" fill="#2f4256"></circle><path d="M0,-5 C3.2,-5 4.6,-1 4.6,6 L-4.6,6 C-4.6,-1 -3.2,-5 0,-5 Z" fill="#2f4256"></path></g>
+            <g transform="translate(96,135)"><circle cx="0" cy="-10" r="3.2" fill="#3a4a5c"></circle><path d="M0,-5 C3.2,-5 4.6,-1 4.6,6 L-4.6,6 C-4.6,-1 -3.2,-5 0,-5 Z" fill="#3a4a5c"></path></g>
+            <g transform="translate(114,135)"><circle cx="0" cy="-10" r="3.2" fill="#9a6c1d"></circle><path d="M0,-5 C3.2,-5 4.6,-1 4.6,6 L-4.6,6 C-4.6,-1 -3.2,-5 0,-5 Z" fill="#9a6c1d"></path></g>
+            <g transform="translate(132,135)"><circle cx="0" cy="-10" r="3.2" fill="#3a4a5c"></circle><path d="M0,-5 C3.2,-5 4.6,-1 4.6,6 L-4.6,6 C-4.6,-1 -3.2,-5 0,-5 Z" fill="#3a4a5c"></path></g>
+            <g transform="translate(150,135)"><circle cx="0" cy="-10" r="3.2" fill="#2f4256"></circle><path d="M0,-5 C3.2,-5 4.6,-1 4.6,6 L-4.6,6 C-4.6,-1 -3.2,-5 0,-5 Z" fill="#2f4256"></path></g>
+          </svg>
+        </div>
+        <div class="rank">🥇
+TOP OF ICEBREAKERS</div>
+        <div class="cap">Begin with a nearly full house already gathered.</div>
+      </div>
+    </div>
+
+    <div class="note">🏆 Your icebreaker rank only sets the <b>starting line</b> — every group can still win. From here, the one way to grow is the stations, all tracked on a single <b>live leaderboard</b>.</div>
+  </section>
+
+  <!-- ===== 2 · THE EIGHT STATIONS (names only) ===== -->
+  <section>
+    <span class="eyebrow">The Eight Stations</span>
+    <h2 class="section">Eight ministries to work through</h2>
+    <hr class="sec-rule">
+    <p class="lead">Here is the full line-up of stations:</p>
+    <div class="snames">
+      <div class="sname"><span class="ico">📱</span><span class="nm">Social Media</span></div>
+      <div class="sname"><span class="ico">🎵</span><span class="nm">Worship Team</span></div>
+      <div class="sname"><span class="ico">🔊</span><span class="nm">Sound Crew</span></div>
+      <div class="sname"><span class="ico">💻</span><span class="nm">Powerpoint Team</span></div>
+      <div class="sname"><span class="ico">🎤</span><span class="nm">Preachers</span></div>
+      <div class="sname"><span class="ico">🤝</span><span class="nm">Welcome Team</span></div>
+      <div class="sname"><span class="ico">🎨</span><span class="nm">Children's Ministry</span></div>
+      <div class="sname"><span class="ico">🔍</span><span class="nm">Finance</span></div>
+    </div>
+    <div class="plus-one">➕ Plus one extra: the <b>Church Upgrade</b> challenge, where you grow your building itself.</div>
+  </section>
+
+  <!-- ===== 4 · LEVELS OF THE STATIONS ===== -->
+  <section>
+    <span class="eyebrow">Inside Each Station</span>
+    <h2 class="section">Every station has three levels</h2>
+    <hr class="sec-rule">
+    <p class="lead">Within every station, the three levels unlock one at a time. You must clear Level 1 before you can attempt Level 2, and Level 2 before Level 3. No skipping ahead to the big rewards.
+
+</p>
+    <div class="ladder">
+      <div class="lvl-card">
+        <span class="lvn">LEVEL 1</span>
+        <div class="nm">Easiest</div>
+        <div class="ds">Start here. Clear it to open Level 2.</div>
+      </div>
+      <div class="arrow">
+        <svg width="34" height="20" viewBox="0 0 34 20" fill="none"><path d="M2 10 H28 M21 3 L29 10 L21 17" stroke="#9a6c1d" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+        <span class="cap">unlocks</span>
+      </div>
+      <div class="lvl-card">
+        <span class="lvn">LEVEL 2</span>
+        <div class="nm">Harder</div>
+        <div class="ds">Bigger reward. Clear it to open Level 3.</div>
+      </div>
+      <div class="arrow">
+        <svg width="34" height="20" viewBox="0 0 34 20" fill="none"><path d="M2 10 H28 M21 3 L29 10 L21 17" stroke="#9a6c1d" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+        <span class="cap">unlocks</span>
+      </div>
+      <div class="lvl-card">
+        <span class="lvn">LEVEL 3</span>
+        <div class="nm">Toughest</div>
+        <div class="ds">The grand prize for finishing a station.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 5 · EACH LEVEL INCREASES THE PERCENTAGE ===== -->
+  <section>
+    <span class="eyebrow">The Rewards</span>
+    <h2 class="section">Each level you clear grows you more</h2>
+    <hr class="sec-rule">
+    <p class="lead">The higher the level, the bigger the boost to your population. The reward jumps with every level you climb:</p>
+    <div class="rewards">
+      <div class="reward l1">
+        <div class="lvn">LEVEL 1</div>
+        <div class="pct">+20%</div>
+        <div class="ds">A steady start to your growth.</div>
+      </div>
+      <div class="reward l2">
+        <div class="lvn">LEVEL 2</div>
+        <div class="pct">+50%</div>
+        <div class="ds">More than double the Level 1 boost.</div>
+      </div>
+      <div class="reward l3">
+        <div class="lvn">LEVEL 3</div>
+        <div class="pct">+200%</div>
+        <div class="ds">The grand payoff for finishing a station.</div>
+      </div>
+    </div>
+    <div class="note">📈 Every reward is also multiplied by your church's <b>earning bonus</b> which gets bigger as your building grows.</div>
+  </section>
+
+  <!-- ===== 6 · TYPES OF BUILDING (church tiers) ===== -->
+  <section>
+    <span class="eyebrow">The Upgrade Track</span>
+    <h2 class="section">Your building grows with your population</h2>
+    <hr class="sec-rule">
+    <p class="lead">As your congregation swells, you can upgrade to a bigger building. Each church size is a separate tier that raises your maximum capacity and gives a permanent earning bonus on every station reward. Members earned over capacity leave your church so keep upgrading.
+
+</p>
+    <div class="tiers">
+      <div class="tier t0" style="height: 280px"><div class="tier-illo"><svg height="42" viewBox="0 0 64 72" fill="none" xmlns="http://www.w3.org/2000/svg"><line x1="32" y1="4" x2="32" y2="16" stroke="#c08a2d" stroke-width="2.5"></line><line x1="26" y1="9" x2="38" y2="9" stroke="#c08a2d" stroke-width="2.5"></line><polygon points="14,38 32,18 50,38" fill="#c08a2d"></polygon><rect x="18" y="38" width="28" height="24" fill="#1b2a39"></rect><rect x="28" y="48" width="9" height="14" rx="1" fill="#e8c879"></rect></svg></div><div class="barcap"></div><div class="lvl">LEVEL 0 · START</div><div class="nm">Home Church</div>
+        <div class="kv"><span class="k">Max capacity</span><span class="v">30</span></div>
+        <div class="kv"><span class="k">Earning bonus</span><span class="v">+0%</span></div>
+      </div>
+      <div class="tier t1" style="height: 290px"><div class="tier-illo"><svg height="60" viewBox="0 0 92 100" fill="none" xmlns="http://www.w3.org/2000/svg"><line x1="23" y1="4" x2="23" y2="16" stroke="#c08a2d" stroke-width="2.5"></line><line x1="17" y1="9" x2="29" y2="9" stroke="#c08a2d" stroke-width="2.5"></line><polygon points="10,42 23,16 36,42" fill="#c08a2d"></polygon><rect x="14" y="42" width="18" height="46" fill="#1b2a39"></rect><polygon points="30,52 54,30 78,52" fill="#c08a2d"></polygon><rect x="34" y="52" width="44" height="36" fill="#1b2a39"></rect><circle cx="56" cy="46" r="4" fill="#e8c879"></circle><rect x="50" y="64" width="12" height="24" rx="6" fill="#e8c879"></rect><rect x="19" y="60" width="8" height="14" rx="1" fill="#e8c879"></rect></svg></div><div class="barcap"></div><div class="lvl">LEVEL 1</div><div class="nm">Family Church</div>
+        <div class="kv"><span class="k">Max capacity</span><span class="v">500</span></div>
+        <div class="kv"><span class="k">Earning bonus</span><span class="v">+10%</span></div>
+        <div class="kv"><span class="k">Needs</span><span class="v">15 ppl</span></div>
+      </div>
+      <div class="tier t2" style="height: 300px"><div class="tier-illo"><svg height="80" viewBox="0 0 124 112" fill="none" xmlns="http://www.w3.org/2000/svg"><line x1="62" y1="2" x2="62" y2="16" stroke="#c08a2d" stroke-width="3"></line><line x1="55" y1="8" x2="69" y2="8" stroke="#c08a2d" stroke-width="3"></line><polygon points="14,62 30,46 46,62" fill="#c08a2d"></polygon><rect x="18" y="62" width="24" height="38" fill="#1b2a39"></rect><polygon points="78,62 94,46 110,62" fill="#c08a2d"></polygon><rect x="82" y="62" width="24" height="38" fill="#1b2a39"></rect><polygon points="44,44 62,16 80,44" fill="#c08a2d"></polygon><rect x="44" y="44" width="36" height="56" fill="#1b2a39"></rect><circle cx="62" cy="54" r="6" fill="#e8c879"></circle><rect x="56" y="76" width="12" height="24" rx="6" fill="#e8c879"></rect><rect x="24" y="74" width="12" height="14" rx="1" fill="#e8c879"></rect><rect x="88" y="74" width="12" height="14" rx="1" fill="#e8c879"></rect></svg></div><div class="barcap"></div><div class="lvl">LEVEL 2</div><div class="nm">Mega Church</div>
+        <div class="kv"><span class="k">Max capacity</span><span class="v">10,000</span></div>
+        <div class="kv"><span class="k">Earning bonus</span><span class="v">+20%</span></div>
+        <div class="kv"><span class="k">Needs</span><span class="v">300 ppl</span></div>
+      </div>
+      <div class="tier t3" style="height: 310px"><div class="tier-illo"><svg height="98" viewBox="0 0 156 134" fill="none" xmlns="http://www.w3.org/2000/svg"><line x1="30" y1="2" x2="30" y2="14" stroke="#c08a2d" stroke-width="3"></line><line x1="24" y1="7" x2="36" y2="7" stroke="#c08a2d" stroke-width="3"></line><polygon points="18,44 30,16 42,44" fill="#c08a2d"></polygon><rect x="20" y="44" width="20" height="76" fill="#1b2a39"></rect><line x1="126" y1="2" x2="126" y2="14" stroke="#c08a2d" stroke-width="3"></line><line x1="120" y1="7" x2="132" y2="7" stroke="#c08a2d" stroke-width="3"></line><polygon points="114,44 126,16 138,44" fill="#c08a2d"></polygon><rect x="116" y="44" width="20" height="76" fill="#1b2a39"></rect><line x1="78" y1="0" x2="78" y2="12" stroke="#c08a2d" stroke-width="3"></line><line x1="71" y1="6" x2="85" y2="6" stroke="#c08a2d" stroke-width="3"></line><polygon points="50,52 78,20 106,52" fill="#c08a2d"></polygon><rect x="46" y="52" width="64" height="68" fill="#1b2a39"></rect><circle cx="78" cy="68" r="10" fill="#e8c879"></circle><rect x="68" y="92" width="20" height="28" rx="10" fill="#e8c879"></rect><rect x="26" y="64" width="10" height="16" rx="1" fill="#e8c879"></rect><rect x="120" y="64" width="10" height="16" rx="1" fill="#e8c879"></rect></svg></div><div class="barcap"></div><div class="lvl">LEVEL 3 · MAX</div><div class="nm">Giga Church</div>
+        <div class="kv"><span class="k">Max capacity</span><span class="v">10M</span></div>
+        <div class="kv"><span class="k">Earning bonus</span><span class="v">+30%</span></div>
+        <div class="kv"><span class="k">Needs</span><span class="v">3,000 ppl</span></div>
+      </div>
+    </div>
+    <div class="note">⚡ The upgrade perk: each time you upgrade, you may perform a one-time theft — stealing members from a rival group(they can never be pushed below the 10-member safety net).</div>
+  </section>
+
+  <!-- ===== 7 · BLUEPRINT HINTS ===== -->
+  <section>
+    <span class="eyebrow">Need a Hand</span>
+    <h2 class="section">Blueprint hints &amp; the safety net</h2>
+    <hr class="sec-rule">
+    <div class="two">
+      <div class="card">
+        <h3>📐 Buy a blueprint hint</h3>
+        <p>Stuck on a Church Upgrade puzzle? Spend a slice of your population on a blueprint hint. Costs are 15% → 20% → 25% and must be bought in order but every group that finishes before you makes the hint 1% cheaper.</p>
+        <div class="barline">📐 Blueprint 2 of 3 · –20% population</div>
+      </div>
+      <div class="card">
+        <h3>🛟 The 10-member safety net</h3>
+        <p>No matter what happens — a costly hint, a rival's theft, a failed event — your congregation size can never drop below 10 members. Every church survives to keep playing.</p>
+        <div class="barline">👥 Floor: 10 members · always</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 8 · HOW IT WORKS (summary) ===== -->
+  <section>
+    <span class="eyebrow">Putting It Together</span>
+    <h2 class="section">How it works, start to finish</h2>
+    <hr class="sec-rule">
+    <div class="loop">
+      <div class="step"><span class="n">1</span><span class="em">🎯</span><div class="ti">Complete a station</div><div class="tx">Your group clears a station's mini-game.</div></div>
+      <div class="step"><span class="n">2</span><span class="em">🔑</span><div class="ti">Leader records it</div><div class="tx">Your leader opens the bot's Admin Section and marks the level complete.</div></div>
+      <div class="step"><span class="n">3</span><span class="em">📈</span><div class="ti">Population grows</div><div class="tx">Members are added by the level's reward and boosted by your church's tier bonus.</div></div>
+      <div class="step"><span class="n">4</span><span class="em">🏆</span><div class="ti">Climb the board</div><div class="tx">Everyone sees the move instantly on the live leaderboard.</div></div>
+    </div>
+    <div class="note">🔑 Becoming a leader (only for mentors): tap "👑 Become Leader" and enter the leader password to unlock the Admin Section. Everyone else can browse the dashboard, leaderboard, journey and hints.</div>
+  </section>
+
+  <!-- ===== 9 · VENUE MAP ===== -->
+  <section>
+    <span class="eyebrow">Find Your Way</span>
+    <h2 class="section">The venue map</h2>
+    <hr class="sec-rule">
+    <div class="venue">
+      <svg viewBox="0 0 1200 760" role="img" aria-label="Ballroom floor plan: a semicircle with its flat side along the top wall and the arc bulging downward. A rectangular corridor extends left off the flat wall holding tables 2 and 7. Along the top wall, left to right: table 4, the stage, and the +1 church-upgrade station. Five tables curve along the arc, right to left: 6, 3, 1, 5, 8. Gold dots mark chairs.">
+        <rect width="1200" height="760" fill="#fdfaf2"></rect>
+        <!-- title block -->
+        <text x="645" y="58" font-size="30" font-weight="800" fill="#16243f" text-anchor="middle" letter-spacing="3">BALLROOM SET UP</text>
+        <text x="645" y="96" font-size="22" font-weight="600" fill="#16243f" text-anchor="middle" letter-spacing="2">SATURDAY 13TH JUNE</text>
+        <text x="599" y="130" font-size="20" fill="#16243f" text-anchor="end">by</text>
+        <rect x="611" y="111" width="84" height="28" rx="14" fill="none" stroke="#b9862c" stroke-width="2"></rect>
+        <text x="653" y="130" font-size="20" font-weight="700" fill="#16243f" text-anchor="middle">7 pm</text>
+        <!-- symbol legend -->
+        <text x="40" y="60" font-size="22" font-weight="700" fill="#16243f" text-decoration="underline">Legend</text>
+        <rect x="48" y="79" width="40" height="22" rx="3" fill="#f2e6c4" stroke="#cda64f" stroke-width="2"></rect>
+        <text x="118" y="96" font-size="20" fill="#16243f">Table</text>
+        <rect x="48" y="115" width="56" height="22" rx="3" fill="#f2e6c4" stroke="#cda64f" stroke-width="2"></rect>
+        <line x1="76.0" y1="115" x2="76.0" y2="137" stroke="#cda64f" stroke-width="2"></line>
+        <text x="118" y="132" font-size="20" fill="#16243f">2 x tables</text>
+        <circle cx="60" cy="162" r="8" fill="#b9862c"></circle>
+        <text x="118" y="168" font-size="20" fill="#16243f">Chairs</text>
+        <!-- room: semicircle (flat wall top, arc down) + left corridor -->
+        <line x1="30" y1="200" x2="1115" y2="200" stroke="#16243f" stroke-width="4"></line>
+        <path d="M1115,200 A470,470 0 0 1 175,200" fill="none" stroke="#16243f" stroke-width="4"></path>
+        <line x1="30" y1="200" x2="30" y2="450" stroke="#16243f" stroke-width="4"></line>
+        <line x1="30" y1="450" x2="175" y2="450" stroke="#16243f" stroke-width="4"></line>
+        <text x="645" y="455" font-size="20" font-style="italic" fill="#9a8a66" text-anchor="middle" letter-spacing="4">GUEST TABLES</text>
+        <!-- corridor: table 2 (chairs above) -->
+        <rect x="40.5" y="247.0" width="124" height="46" rx="6" fill="#f2e6c4" stroke="#cda64f" stroke-width="3"></rect>
+        <line x1="102.5" y1="247.0" x2="102.5" y2="293.0" stroke="#cda64f" stroke-width="2.5"></line>
+        <circle cx="88.5" cy="236.0" r="7" fill="#b9862c"></circle>
+        <circle cx="116.5" cy="236.0" r="7" fill="#b9862c"></circle>
+        <text x="102.5" y="270.0" font-size="26" font-weight="800" fill="#16243f" text-anchor="middle" dominant-baseline="central">2</text>
+        <!-- corridor: table 7 (chairs below) -->
+        <rect x="40.5" y="375.0" width="124" height="46" rx="6" fill="#f2e6c4" stroke="#cda64f" stroke-width="3"></rect>
+        <line x1="102.5" y1="375.0" x2="102.5" y2="421.0" stroke="#cda64f" stroke-width="2.5"></line>
+        <circle cx="88.5" cy="436.0" r="7" fill="#b9862c"></circle>
+        <circle cx="116.5" cy="436.0" r="7" fill="#b9862c"></circle>
+        <text x="102.5" y="398.0" font-size="26" font-weight="800" fill="#16243f" text-anchor="middle" dominant-baseline="central">7</text>
+        <!-- top wall: table 4 -->
+        <rect x="408.0" y="262.0" width="124" height="46" rx="6" fill="#f2e6c4" stroke="#cda64f" stroke-width="3"></rect>
+        <line x1="470" y1="262.0" x2="470" y2="308.0" stroke="#cda64f" stroke-width="2.5"></line>
+        <circle cx="456.0" cy="249.0" r="7" fill="#b9862c"></circle>
+        <circle cx="484.0" cy="249.0" r="7" fill="#b9862c"></circle>
+        <text x="470.0" y="285.0" font-size="26" font-weight="800" fill="#16243f" text-anchor="middle" dominant-baseline="central">4</text>
+        <!-- top wall: stage -->
+        <rect x="610" y="208" width="200" height="74" rx="6" fill="#f2e6c4" stroke="#b9862c" stroke-width="4"></rect>
+        <text x="710" y="245" font-size="28" font-weight="800" fill="#b9862c" text-anchor="middle" dominant-baseline="central" letter-spacing="2">STAGE</text>
+        <!-- top wall: +1 church upgrade -->
+        <rect x="753.0" y="327.0" width="124" height="46" rx="6" fill="#16243f" stroke="#16243f" stroke-width="3"></rect>
+        <line x1="815" y1="327.0" x2="815" y2="373.0" stroke="#b9862c" stroke-width="2.5"></line>
+        <circle cx="801.0" cy="314.0" r="7" fill="#b9862c"></circle>
+        <circle cx="829.0" cy="314.0" r="7" fill="#b9862c"></circle>
+        <text x="815.0" y="350.0" font-size="22" font-weight="800" fill="#fdfaf2" text-anchor="middle" dominant-baseline="central">+1</text>
+        <!-- arc: table 6 -->
+        <g transform="rotate(106.00,1034.3,311.6)">
+        <rect x="970.3" y="288.6" width="128" height="46" rx="6" fill="#f2e6c4" stroke="#cda64f" stroke-width="3"></rect>
+        <line x1="1034.3" y1="288.6" x2="1034.3" y2="334.6" stroke="#cda64f" stroke-width="2.5"></line>
+        </g>
+        <circle cx="987.9" cy="313.9" r="7" fill="#b9862c"></circle>
+        <circle cx="996.2" cy="285.1" r="7" fill="#b9862c"></circle>
+        <text x="1034.3" y="311.6" font-size="26" font-weight="800" fill="#16243f" text-anchor="middle" dominant-baseline="central">6</text>
+        <!-- arc: table 3 -->
+        <g transform="rotate(140.00,905.3,510.2)">
+        <rect x="841.3" y="487.2" width="128" height="46" rx="6" fill="#f2e6c4" stroke="#cda64f" stroke-width="3"></rect>
+        <line x1="905.3" y1="487.2" x2="905.3" y2="533.2" stroke="#cda64f" stroke-width="2.5"></line>
+        </g>
+        <circle cx="865.6" cy="486.2" r="7" fill="#b9862c"></circle>
+        <circle cx="888.5" cy="466.9" r="7" fill="#b9862c"></circle>
+        <text x="905.3" y="510.2" font-size="26" font-weight="800" fill="#16243f" text-anchor="middle" dominant-baseline="central">3</text>
+        <!-- arc: table 1 -->
+        <g transform="rotate(174.00,687.3,602.8)">
+        <rect x="623.3" y="579.8" width="128" height="46" rx="6" fill="#f2e6c4" stroke="#cda64f" stroke-width="3"></rect>
+        <line x1="687.3" y1="579.8" x2="687.3" y2="625.8" stroke="#cda64f" stroke-width="2.5"></line>
+        </g>
+        <circle cx="667.8" cy="560.6" r="7" fill="#b9862c"></circle>
+        <circle cx="697.7" cy="557.5" r="7" fill="#b9862c"></circle>
+        <text x="687.3" y="602.8" font-size="26" font-weight="800" fill="#16243f" text-anchor="middle" dominant-baseline="central">1</text>
+        <!-- arc: table 5 -->
+        <g transform="rotate(208.00,454.9,557.6)">
+        <rect x="390.9" y="534.6" width="128" height="46" rx="6" fill="#f2e6c4" stroke="#cda64f" stroke-width="3"></rect>
+        <line x1="454.9" y1="534.6" x2="454.9" y2="580.6" stroke="#cda64f" stroke-width="2.5"></line>
+        </g>
+        <circle cx="462.3" cy="511.7" r="7" fill="#b9862c"></circle>
+        <circle cx="488.8" cy="525.8" r="7" fill="#b9862c"></circle>
+        <text x="454.9" y="557.6" font-size="26" font-weight="800" fill="#16243f" text-anchor="middle" dominant-baseline="central">5</text>
+        <!-- arc: table 8 -->
+        <g transform="rotate(242.00,287.4,390.1)">
+        <rect x="223.4" y="367.1" width="128" height="46" rx="6" fill="#f2e6c4" stroke="#cda64f" stroke-width="3"></rect>
+        <line x1="287.4" y1="367.1" x2="287.4" y2="413.1" stroke="#cda64f" stroke-width="2.5"></line>
+        </g>
+        <circle cx="319.2" cy="356.2" r="7" fill="#b9862c"></circle>
+        <circle cx="333.3" cy="382.7" r="7" fill="#b9862c"></circle>
+        <text x="287.4" y="390.1" font-size="26" font-weight="800" fill="#16243f" text-anchor="middle" dominant-baseline="central">8</text>
+        <text x="645" y="745" font-size="17" font-style="italic" fill="#9a8a66" text-anchor="middle">Rough layout · not to scale · positions to be finalised</text>
+      </svg>
+
+
+      <div class="station-key">
+        <div class="sk"><b>1</b> Social Media</div>
+        <div class="sk"><b>2</b> Worship Team</div>
+        <div class="sk"><b>3</b> Sound Crew</div>
+        <div class="sk"><b>4</b> Powerpoint Team</div>
+        <div class="sk"><b>5</b> Preachers</div>
+        <div class="sk"><b>6</b> Welcome Team</div>
+        <div class="sk"><b>7</b> Children's Ministry</div>
+        <div class="sk"><b>8</b> Finance</div>
+        <div class="sk"><b style="background:#1b2a39;font-size:11px">+1</b> Church Upgrade</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 10 · TIMED EVENTS ===== -->
+  <section>
+    <span class="eyebrow">Expect the Unexpected</span>
+    <h2 class="section">Three live timed events</h2>
+    <hr class="sec-rule">
+    <div class="ev">
+      <div class="eh"><span class="e">⏱️</span><span class="t">Three surprises through the night</span></div>
+      <div class="tx">Over the course of the game, <b>three timed events</b> will hit every church at once — some a blessing, some a trial. We won't spoil what they are.</div>
+    </div>
+    <div class="note">📢 Keep a sharp lookout for the emcees and the bot's announcements! When an event drops, react fast.</div>
+  </section>
+
+
+  <!-- ===================== FOOTER ===================== -->
+  <footer>
+    <div class="ft-mark"><span class="c">⛪</span><span>Build the Biggest Church · MYLC 2026</span></div>
+    <span>So… who will build the biggest church? And is that really the point?</span>
+  </footer>
+
+</div>
+
+<template id="__bundler_thumbnail" data-bg-color="#f6f1e7">
+  <svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+    <rect width="1200" height="800" fill="#f6f1e7"></rect>
+    <circle cx="600" cy="300" r="150" fill="#c08a2d"></circle>
+    <g transform="translate(600 300)">
+      <line x1="0" y1="-95" x2="0" y2="-55" stroke="#1b2a39" stroke-width="10"></line>
+      <line x1="-20" y1="-78" x2="20" y2="-78" stroke="#1b2a39" stroke-width="10"></line>
+      <polygon points="-62,-40 0,-92 62,-40" fill="#1b2a39"></polygon>
+      <rect x="-50" y="-40" width="100" height="86" fill="#1b2a39"></rect>
+      <rect x="-18" y="-2" width="36" height="48" rx="18" fill="#e8c879"></rect>
+    </g>
+    <text x="600" y="560" text-anchor="middle" font-family="Georgia, serif" font-size="74" font-weight="700" fill="#1b2a39">Build the Biggest Church</text>
+    <text x="600" y="630" text-anchor="middle" font-family="Arial, sans-serif" font-size="30" font-weight="700" letter-spacing="6" fill="#9a6c1d">MYLC 2026 · HOW TO PLAY</text>
+  </svg>
+</template>
+
+</body></html>

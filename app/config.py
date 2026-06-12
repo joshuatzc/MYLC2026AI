@@ -25,6 +25,7 @@ class Settings:
     API_HOST: str = os.getenv("API_HOST", "0.0.0.0")
     API_PORT: int = int(os.getenv("API_PORT", "8000"))
     SECRET_KEY: str = os.getenv("SECRET_KEY", "change-me-in-production")
+    BASE_URL: str = os.getenv("BASE_URL", "")
 
     # --- Game defaults ---
     STARTING_POPULATION: int = 10
